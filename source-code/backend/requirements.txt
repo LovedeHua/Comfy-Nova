@@ -2,7 +2,11 @@
 # Python 3.12.x
 
 # GUI Framework
-pywebview>=6.0,<7.0
+# 6.2 起 winforms 后端的 create_window / resize / move 统一接收逻辑像素并在内部
+# 乘 DPI 缩放下限；6.0/6.1 的 Size 直接当物理像素用。本项目的窗口尺寸链路
+# （main.py 启动尺寸、api.py 的 resizeWindow/maximizeApp 还原）都按逻辑像素
+# 编写，低于 6.2 会让窗口在高 DPI 下缩到设置的 2/3 甚至一半，不可降级。
+pywebview>=6.2,<7.0
 
 # HTTP Server
 flask>=3.0.0
