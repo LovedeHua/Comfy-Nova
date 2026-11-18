@@ -3,6 +3,7 @@
  */
 
 import { useRef, useCallback, forwardRef, useImperativeHandle, useMemo, useState, useEffect } from 'react'
+import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAssetStore } from '@/stores/useAssetStore'
 import { AssetCard } from './AssetCard'
@@ -170,16 +171,28 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
             {columns.map((column, colIndex) => (
               <div key={colIndex} className="flex flex-1 flex-col gap-5">
                 {column.map((asset) => (
-                  <AssetCard
+                  <div
                     key={asset.id}
-                    asset={asset}
-                    ref={(el) => registerCardRef(asset.id, el)}
-                    onClick={() => onImageClick?.(asset)}
-                    onDoubleClick={() => onImageDoubleClick?.(asset)}
-                    onView={() => onView?.(asset)}
-                    onContextMenu={(e) => onImageContextMenu?.(e, asset)}
-                    isBatchMode={isBatchMode}
-                  />
+                    // 瀑布流是变高布局，没法直接用行虚拟化；用 content-visibility
+                    // 让浏览器跳过视口外卡片的布局与绘制。contain-intrinsic-size
+                    // 给一个估算高度，避免滚动条长度跳变。
+                    style={{
+                      contentVisibility: 'auto',
+                      containIntrinsicSize: `auto ${Math.round(
+                        thumbnailSize * ((asset.height || 1) / (asset.width || 1))
+                      )}px`
+                    } as CSSProperties}
+                  >
+                    <AssetCard
+                      asset={asset}
+                      ref={(el) => registerCardRef(asset.id, el)}
+                      onClick={() => onImageClick?.(asset)}
+                      onDoubleClick={() => onImageDoubleClick?.(asset)}
+                      onView={() => onView?.(asset)}
+                      onContextMenu={(e) => onImageContextMenu?.(e, asset)}
+                      isBatchMode={isBatchMode}
+                    />
+                  </div>
                 ))}
               </div>
             ))}

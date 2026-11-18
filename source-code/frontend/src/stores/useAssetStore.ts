@@ -248,6 +248,10 @@ const applyMovedAssetPaths = (
   })
 }
 
+// getFilteredAssets 的结果缓存：键是筛选条件引用的元组，值上一次过滤结果。
+// 放在模块级而不是 state 里，避免触发额外渲染。
+const filterCache: { key: unknown[]; value: Asset[] } = { key: [], value: [] }
+
 export const useAssetStore = create<AssetStore>((set, get) => ({
   assets: [],
   categories: [],
@@ -1158,6 +1162,28 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
 
   getFilteredAssets: () => {
     const state = get()
+
+    // 同一组筛选条件 + 同一批资产时复用上次结果：
+    // 页面每帧会调本函数（还经 getGalleryItems 间接再调一次），
+    // 不缓存就是每帧 O(N log N) 重排 + 新建数组。
+    const cacheKey = [
+      state.assets,
+      state.searchQuery,
+      state.selectedCategoryId,
+      state.showFoldersInList,
+      state.typeFilter,
+      state.onlyWithWorkflow,
+      state.modelFilter,
+      state.dateFilter,
+      state.ratingFilter,
+      state.sortBy,
+      state.sortDir,
+      state.categories
+    ]
+    if (filterCache.key.length === cacheKey.length && cacheKey.every((v, i) => v === filterCache.key[i])) {
+      return filterCache.value
+    }
+
     let filtered = state.assets
 
     if (state.searchQuery) {
@@ -1165,6 +1191,9 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       filtered = filtered.filter(
         (a) =>
           a.filename.toLowerCase().includes(query) ||
+          // prompt 正文不在列表里（只有 hasPrompt 标记），已加载过的（从详情接口
+          // 或扫描进度拿到的）仍参与匹配；未加载的不做隐式网络请求，避免边打字
+          // 边发请求。需要按提示词搜索时由界面显式触发全量补全。
           a.prompt?.toLowerCase().includes(query) ||
           a.model?.toLowerCase().includes(query) ||
           a.description?.toLowerCase().includes(query) ||
@@ -1225,6 +1254,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       }
     })
 
+    filterCache.key = cacheKey
+    filterCache.value = filtered
     return filtered
   },
 
