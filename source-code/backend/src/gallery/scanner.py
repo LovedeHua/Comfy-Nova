@@ -179,50 +179,53 @@ class GalleryScanner:
 
         # logger.info(f"[GalleryScanner] 开始扫描 {library_path}, 共 {total_files} 个文件")
 
-        for current, file_path in enumerate(all_files):
-            if self._cancelled:
-                    # logger.info("[GalleryScanner] 扫描已取消")
-                break
+        # 整批写入包进一次 batch_updates，理由同 scan_library_incremental：
+        # 逐条 save() 会让全量重建变成 O(N^2)。
+        with gallery_storage.batch_updates():
+            for current, file_path in enumerate(all_files):
+                if self._cancelled:
+                # logger.info("[GalleryScanner] 扫描已取消")
+                    break
 
-            try:
-                file_path_str = str(file_path)
-                found_files[file_path_str] = True
+                try:
+                    file_path_str = str(file_path)
+                    found_files[file_path_str] = True
 
-                relative_dir = file_path.parent.relative_to(library_dir)
-                folder_path = str(relative_dir).replace("\\", "/") if str(relative_dir) != "." else None
+                    relative_dir = file_path.parent.relative_to(library_dir)
+                    folder_path = str(relative_dir).replace("\\", "/") if str(relative_dir) != "." else None
 
-                category_id = None
-                if folder_path:
-                    category = gallery_storage.get_category_by_folder_path(folder_path)
-                    if category:
-                        category_id = category.id
+                    category_id = None
+                    if folder_path:
+                        category = gallery_storage.get_category_by_folder_path(folder_path)
+                        if category:
+                            category_id = category.id
 
-                asset_data = None
-                if file_path_str in existing_assets:
-                    existing_asset = existing_assets[file_path_str]
-                    if self._needs_update(existing_asset, file_path):
-                        self._update_asset(existing_asset, file_path, category_id)
-                        updated_count += 1
-                        asset_data = existing_asset.to_dict()
-                else:
-                    asset = self._create_asset(file_path, category_id)
-                    if asset:
-                        gallery_storage.add_asset(asset)
-                        added_count += 1
-                        asset_data = asset.to_dict()
+                    asset_data = None
+                    if file_path_str in existing_assets:
+                        existing_asset = existing_assets[file_path_str]
+                        if self._needs_update(existing_asset, file_path):
+                            self._update_asset(existing_asset, file_path, category_id)
+                            updated_count += 1
+                            asset_data = existing_asset.to_dict()
+                    else:
+                        asset = self._create_asset(file_path, category_id)
+                        if asset:
+                            gallery_storage.add_asset(asset)
+                            added_count += 1
+                            asset_data = asset.to_dict()
 
-                if progress_callback:
-                    progress_callback(current + 1, total_files, file_path.name, asset_data)
-            except Exception as e:
-                error_msg = f"处理文件失败 {file_path}: {e}"
-                # logger.error(f"[GalleryScanner] {error_msg}")
-                errors.append(error_msg)
+                    if progress_callback:
+                        progress_callback(current + 1, total_files, file_path.name, asset_data)
+                except Exception as e:
+                    error_msg = f"处理文件失败 {file_path}: {e}"
+                    # logger.error(f"[GalleryScanner] {error_msg}")
+                    errors.append(error_msg)
 
-        removed_count = 0
-        for file_path_str in existing_assets:
-            if file_path_str not in found_files:
-                gallery_storage.delete_asset(existing_assets[file_path_str].id)
-                removed_count += 1
+            removed_count = 0
+            for file_path_str in existing_assets:
+                if file_path_str not in found_files:
+                    gallery_storage.delete_asset(existing_assets[file_path_str].id)
+                    removed_count += 1
 
         gallery_storage.update_settings(last_scan_time=datetime.now().isoformat())
 
@@ -276,81 +279,84 @@ class GalleryScanner:
         all_files = list(self._find_media_files(library_dir))
         total_files = len(all_files)
 
-        for current, file_path in enumerate(all_files):
-            if self._cancelled:
-                break
+        # 整批写入包进一次 batch_updates：区间内 add/update/delete 只置脏标记，
+        # 退出时统一落盘一次。此前每条资产都整份 json.dump，N 条即 O(N^2)。
+        with gallery_storage.batch_updates():
+            for current, file_path in enumerate(all_files):
+                if self._cancelled:
+                    break
 
-            try:
-                file_path_str = str(file_path)
-                found_files[file_path_str] = True
+                try:
+                    file_path_str = str(file_path)
+                    found_files[file_path_str] = True
 
-                relative_dir = file_path.parent.relative_to(library_dir)
-                folder_path = str(relative_dir).replace("\\", "/") if str(relative_dir) != "." else None
+                    relative_dir = file_path.parent.relative_to(library_dir)
+                    folder_path = str(relative_dir).replace("\\", "/") if str(relative_dir) != "." else None
 
-                category_id = None
-                if folder_path:
-                    category = gallery_storage.get_category_by_folder_path(folder_path)
-                    if category:
-                        category_id = category.id
+                    category_id = None
+                    if folder_path:
+                        category = gallery_storage.get_category_by_folder_path(folder_path)
+                        if category:
+                            category_id = category.id
 
-                asset_data = None
-                if file_path_str in existing_assets:
-                    existing_asset = existing_assets[file_path_str]
-                    if self._needs_update(existing_asset, file_path):
-                        new_asset = self._create_asset(file_path, category_id)
-                        if new_asset:
-                            new_asset.id = existing_asset.id
-                            update_dict = {
-                                "filename": new_asset.filename,
-                                "file_path": new_asset.file_path,
-                                "asset_type": new_asset.asset_type,
-                                "width": new_asset.width,
-                                "height": new_asset.height,
-                                "size": new_asset.size,
-                                "created_at": new_asset.created_at,
-                                "category_id": new_asset.category_id,
-                                "thumbnail_path": new_asset.thumbnail_path,
-                                "has_workflow": new_asset.has_workflow,
-                                "prompt": new_asset.prompt,
-                                "negative_prompt": new_asset.negative_prompt,
-                                "model": new_asset.model,
-                                "sampler": new_asset.sampler,
-                                "steps": new_asset.steps,
-                                "cfg": new_asset.cfg,
-                                "seed": new_asset.seed,
-                                "duration": new_asset.duration,
-                                "nsfw_score": new_asset.nsfw_score,
-                                "nsfw_label": new_asset.nsfw_label,
-                                "tags": new_asset.tags,
-                                "preview_blurred": new_asset.preview_blurred,
-                            }
-                            gallery_storage.update_asset(existing_asset.id, **update_dict)
-                            updated_count += 1
-                            asset_data = new_asset.to_dict()
-                            asset_data["id"] = existing_asset.id
-                else:
-                    asset = self._create_asset(file_path, category_id)
-                    if asset:
-                        gallery_storage.add_asset(asset)
-                        added_count += 1
-                        asset_data = asset.to_dict()
+                    asset_data = None
+                    if file_path_str in existing_assets:
+                        existing_asset = existing_assets[file_path_str]
+                        if self._needs_update(existing_asset, file_path):
+                            new_asset = self._create_asset(file_path, category_id)
+                            if new_asset:
+                                new_asset.id = existing_asset.id
+                                update_dict = {
+                                    "filename": new_asset.filename,
+                                    "file_path": new_asset.file_path,
+                                    "asset_type": new_asset.asset_type,
+                                    "width": new_asset.width,
+                                    "height": new_asset.height,
+                                    "size": new_asset.size,
+                                    "created_at": new_asset.created_at,
+                                    "category_id": new_asset.category_id,
+                                    "thumbnail_path": new_asset.thumbnail_path,
+                                    "has_workflow": new_asset.has_workflow,
+                                    "prompt": new_asset.prompt,
+                                    "negative_prompt": new_asset.negative_prompt,
+                                    "model": new_asset.model,
+                                    "sampler": new_asset.sampler,
+                                    "steps": new_asset.steps,
+                                    "cfg": new_asset.cfg,
+                                    "seed": new_asset.seed,
+                                    "duration": new_asset.duration,
+                                    "nsfw_score": new_asset.nsfw_score,
+                                    "nsfw_label": new_asset.nsfw_label,
+                                    "tags": new_asset.tags,
+                                    "preview_blurred": new_asset.preview_blurred,
+                                }
+                                gallery_storage.update_asset(existing_asset.id, **update_dict)
+                                updated_count += 1
+                                asset_data = new_asset.to_dict()
+                                asset_data["id"] = existing_asset.id
+                    else:
+                        asset = self._create_asset(file_path, category_id)
+                        if asset:
+                            gallery_storage.add_asset(asset)
+                            added_count += 1
+                            asset_data = asset.to_dict()
 
-                if progress_callback:
-                    progress_callback(current + 1, total_files, file_path.name, asset_data)
-            except Exception as e:
-                error_msg = f"处理文件失败 {file_path}: {e}"
-                errors.append(error_msg)
+                    if progress_callback:
+                        progress_callback(current + 1, total_files, file_path.name, asset_data)
+                except Exception as e:
+                    error_msg = f"处理文件失败 {file_path}: {e}"
+                    errors.append(error_msg)
 
-        removed_count = 0
-        for file_path_str in existing_assets:
-            if file_path_str not in found_files:
-                asset = existing_assets[file_path_str]
-                if asset.thumbnail_path:
-                    thumbnail_full_path = self._thumbnails_dir.parent / asset.thumbnail_path
-                    if thumbnail_full_path.exists():
-                        thumbnail_full_path.unlink()
-                gallery_storage.delete_asset(asset.id)
-                removed_count += 1
+            removed_count = 0
+            for file_path_str in existing_assets:
+                if file_path_str not in found_files:
+                    asset = existing_assets[file_path_str]
+                    if asset.thumbnail_path:
+                        thumbnail_full_path = self._thumbnails_dir.parent / asset.thumbnail_path
+                        if thumbnail_full_path.exists():
+                            thumbnail_full_path.unlink()
+                    gallery_storage.delete_asset(asset.id)
+                    removed_count += 1
 
         gallery_storage.update_settings(last_scan_time=datetime.now().isoformat())
 

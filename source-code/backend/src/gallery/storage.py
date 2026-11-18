@@ -7,6 +7,7 @@ import json
 import uuid
 import shutil
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -21,7 +22,11 @@ class GalleryStorage:
 
     def __init__(self):
         self._data: Optional[GalleryData] = None
-        self._lock = threading.Lock()
+        # 用 RLock：load() 在持锁期间会调 save()（首次建库时落盘），普通 Lock 会自锁
+        self._lock = threading.RLock()
+        # 批量写入状态：>0 时 save() 只置脏标记，由 batch_updates() 退出时统一落盘一次
+        self._batch_depth = 0
+        self._dirty = False
         self._refresh_paths()
 
     def _refresh_paths(self) -> None:
@@ -69,16 +74,51 @@ class GalleryStorage:
 
             return self._data
 
+    @contextmanager
+    def batch_updates(self):
+        """把一批写操作合并成一次落盘。
+
+        扫描 N 个文件时，若每次 add_asset 都整份 json.dump 一次，总代价是 O(N^2)：
+        实测 3000 个资产仅落盘就要约 99 秒。此上下文把区间内的 save() 降级为
+        置脏标记，退出时统一写一次（嵌套调用以最外层为准）。
+
+        Yields:
+            None
+        """
+        with self._lock:
+            self._batch_depth += 1
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._batch_depth -= 1
+                should_flush = self._batch_depth == 0 and self._dirty
+            if should_flush:
+                self.save()
+
     def save(self) -> bool:
-        """保存资产库数据"""
+        """保存资产库数据
+
+        批量模式下只置脏标记、不落盘，由 batch_updates() 退出时统一写一次。
+        """
         if self._data is None:
             return False
+
+        with self._lock:
+            if self._batch_depth > 0:
+                self._dirty = True
+                return True
+            self._dirty = False
+            payload = self._data.to_dict()
 
         self._ensure_dirs()
 
         try:
-            with open(self._assets_file, "w", encoding="utf-8") as f:
-                json.dump(self._data.to_dict(), f, ensure_ascii=False, indent=2)
+            # 先写临时文件再原子替换：中途崩溃不会留下半截 assets.json
+            tmp_file = self._assets_file.with_suffix(".json.tmp")
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            tmp_file.replace(self._assets_file)
             logger.info("[GalleryStorage] 保存资产库数据成功")
             return True
         except Exception as e:
