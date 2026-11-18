@@ -144,10 +144,45 @@ for _wf_path in _winforms_candidates:
             print(f"[spec] .NET 8: winforms.py patched: {_wf_path}")
         break
 
+# ============================================
+# C 运行时依赖补齐：libffi-8.dll
+#
+# Python 的 _ctypes.pyd 在 PE 导入表里依赖 libffi-8.dll，但 PyInstaller 的
+# bindepend 只沿 sys.base_prefix 下的标准布局解析。经 py install / pyenv-win /
+# 部分 conda 发行版安装的解释器把 libffi-8.dll 放在 DLLs\ 下且不在打包器
+# 搜索路径内，产物就会缺这个 DLL：应用启动时 backend/src/utils/preflight.py
+# 第 12 行 import ctypes 立即抛 "DLL load failed while importing _ctypes"，
+# 而此时日志系统还没初始化，用户看到的是一个没有任何日志的静默闪退。
+# 因此在 Analysis 之前显式从解释器目录补收，找不到时明确告警而不是静默漏掉。
+# ============================================
+_ffi_binaries = []
+_ffi_search_dirs = []
+for _base in dict.fromkeys([getattr(sys, 'base_prefix', ''), getattr(sys, 'prefix', '')]):
+    if not _base:
+        continue
+    for _sub in ('DLLs', '', os.path.join('Library', 'bin')):
+        _candidate = os.path.join(_base, _sub) if _sub else _base
+        if os.path.isdir(_candidate) and _candidate not in _ffi_search_dirs:
+            _ffi_search_dirs.append(_candidate)
+
+for _dir in _ffi_search_dirs:
+    for _name in os.listdir(_dir):
+        _lower = _name.lower()
+        if _lower.startswith('libffi') and _lower.endswith('.dll'):
+            _full = os.path.join(_dir, _name)
+            if _full not in [item[0] for item in _ffi_binaries]:
+                _ffi_binaries.append((_full, '.'))
+
+if _ffi_binaries:
+    for _src, _dst in _ffi_binaries:
+        print(f"[spec] 补收 C 运行时依赖: {os.path.basename(_src)}")
+else:
+    print('[spec] [警告] 未找到 libffi-*.dll，若产物启动时报 _ctypes 加载失败请检查 Python 安装')
+
 a = Analysis(
     ['backend/main.py'],
     pathex=[os.path.abspath('.')],
-    binaries=[],
+    binaries=_ffi_binaries,
     datas=_datas,
     hiddenimports=[
         'webview',
