@@ -111,12 +111,25 @@ export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
       }
     }
 
+    // 列表接口只下发 hasPrompt 标记，正文按需从详情接口取，
+    // 避免千张规模下把每条的 prompt 正文都塞进列表载荷（约省 60%）。
+    const hasPrompt = asset.hasPrompt ?? !!asset.prompt
+
     const handleCopyPrompt = async (e: React.MouseEvent) => {
       e.stopPropagation()
-      if (!asset.prompt) return
+      if (!hasPrompt) return
 
       try {
-        await navigator.clipboard.writeText(asset.prompt)
+        let promptText = asset.prompt
+        if (!promptText && window.pywebview?.api?.gallery_get_asset) {
+          const detail = await window.pywebview.api.gallery_get_asset(asset.id)
+          promptText = detail?.asset?.prompt
+        }
+        if (!promptText) {
+          error(t('asset.toast.copyFailed'))
+          return
+        }
+        await navigator.clipboard.writeText(promptText)
         success(t('asset.toast.copySuccess'))
       } catch {
         error(t('asset.toast.copyFailed'))
@@ -290,25 +303,25 @@ export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
             <Send className="size-4 text-muted-foreground" />
           </Button>
 
-          {(asset.hasWorkflow || asset.prompt) && (
+          {(asset.hasWorkflow || hasPrompt) && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={asset.prompt ? handleCopyPrompt : undefined}
-              disabled={!asset.prompt}
+              onClick={hasPrompt ? handleCopyPrompt : undefined}
+              disabled={!hasPrompt}
               className={cn(
                 'absolute right-2 top-2 size-6',
                 'backdrop-blur-sm',
                 'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
-                asset.prompt
+                hasPrompt
                   ? 'bg-success/80 hover:bg-success/70'
                   : 'bg-background/80 hover:bg-background/90'
               )}
-              title={asset.prompt ? t('asset.copyPrompt') : t('asset.copyPromptNoPrompt')}
+              title={hasPrompt ? t('asset.copyPrompt') : t('asset.copyPromptNoPrompt')}
             >
               <Copy className={cn(
                 'size-3',
-                asset.prompt ? 'text-success-foreground' : 'text-muted-foreground'
+                hasPrompt ? 'text-success-foreground' : 'text-muted-foreground'
               )} />
             </Button>
           )}

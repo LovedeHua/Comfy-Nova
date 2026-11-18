@@ -17,6 +17,9 @@ export interface Asset {
   categoryId: string | null
   prompt?: string
   negativePrompt?: string
+  /** 列表接口只下发布尔标记，正文需通过 gallery_get_asset(id) 取 */
+  hasPrompt?: boolean
+  hasNegativePrompt?: boolean
   model?: string
   sampler?: string
   steps?: number

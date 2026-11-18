@@ -119,6 +119,43 @@ class Asset:
         result["rating"] = self.rating
         return result
 
+    def to_list_dict(self) -> dict:
+        """列表场景用的轻量视图。
+
+        卡片的筛选、排序、渲染只依赖下列字段；prompt / negativePrompt 正文
+        单条可达数百字符，全量下发时占列表载荷的约 60%（实测 1000 条
+        省 60%）。正文改由 gallery_get_asset(id) 按需取，这里只给布尔标记。
+        """
+        return {
+            "id": self.id,
+            "filename": self.filename,
+            "filePath": self.file_path,
+            "type": self.asset_type,
+            "width": self.width,
+            "height": self.height,
+            "size": self.size,
+            "createdAt": self.created_at,
+            "isFavorite": self.is_favorite,
+            "categoryId": self.category_id,
+            "thumbnailPath": self.thumbnail_path,
+            "hasWorkflow": self.has_workflow,
+            "model": self.model,
+            "sampler": self.sampler,
+            "steps": self.steps,
+            "cfg": self.cfg,
+            "seed": self.seed,
+            "duration": self.duration,
+            "nsfwScore": self.nsfw_score,
+            "nsfwLabel": self.nsfw_label,
+            "tags": self.tags,
+            "description": self.description,
+            "previewBlurred": self.preview_blurred,
+            "rating": self.rating,
+            # 正文不下发，只标记有无：卡片用它决定复制按钮的可用态
+            "hasPrompt": bool(self.prompt),
+            "hasNegativePrompt": bool(self.negative_prompt),
+        }
+
     @classmethod
     def from_dict(cls, data: dict) -> "Asset":
         return cls(

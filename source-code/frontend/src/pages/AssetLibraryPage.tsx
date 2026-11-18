@@ -131,6 +131,56 @@ export default function AssetLibraryPage() {
     [assets, theaterAssetId]
   )
 
+  // 列表接口不下发 prompt 正文（千张规模下占约 60% 载荷），
+  // 影院模式要展示正文，因此在打开时按 id 补取一次，取到的内容缓存到本地 state。
+  const [theaterPrompt, setTheaterPrompt] = useState<{ positive?: string; negative?: string } | null>(null)
+
+  useEffect(() => {
+    if (!theaterAsset?.id) {
+      setTheaterPrompt(null)
+      return
+    }
+    // 列表对象里若已带正文（例如轮询进度新插入的资产）就不再请求
+    if (theaterAsset.prompt || theaterAsset.negativePrompt) {
+      setTheaterPrompt({ positive: theaterAsset.prompt, negative: theaterAsset.negativePrompt })
+      return
+    }
+    if (!window.pywebview?.api?.gallery_get_asset) {
+      setTheaterPrompt(null)
+      return
+    }
+
+    let cancelled = false
+    window.pywebview.api
+      .gallery_get_asset(theaterAsset.id)
+      .then((detail) => {
+        if (cancelled) return
+        setTheaterPrompt({
+          positive: detail?.asset?.prompt,
+          negative: detail?.asset?.negativePrompt
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setTheaterPrompt(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [theaterAsset?.id, theaterAsset?.prompt, theaterAsset?.negativePrompt])
+
+  const theaterAssetWithPrompt = useMemo(
+    () =>
+      theaterAsset
+        ? {
+            ...theaterAsset,
+            prompt: theaterPrompt?.positive,
+            negativePrompt: theaterPrompt?.negative
+          }
+        : null,
+    [theaterAsset, theaterPrompt]
+  )
+
   const resolveCategoryPath = useCallback(
     (asset: Asset | null) =>
       asset?.categoryId
@@ -528,7 +578,7 @@ export default function AssetLibraryPage() {
             {theaterAsset && (
               <div className="absolute inset-0 z-30 flex flex-col bg-theater">
                 <AssetTheaterView
-                  asset={theaterAsset}
+                  asset={theaterAssetWithPrompt ?? theaterAsset}
                   assets={filteredAssets}
                   categoryPath={resolveCategoryPath(theaterAsset)}
                   onNavigate={(item) => setTheaterAssetId(item.id)}

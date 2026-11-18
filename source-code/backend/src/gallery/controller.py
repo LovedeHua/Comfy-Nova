@@ -62,7 +62,9 @@ class GalleryController:
 
             return {
                 "success": True,
-                "assets": [a.to_dict() for a in assets],
+                # 列表只下发轻量视图：prompt / negativePrompt 正文在千张规模下
+                # 占载荷约 60%，而卡片只判断有无。正文由 gallery_get_asset(id) 按需取。
+                "assets": [a.to_list_dict() for a in assets],
                 "categories": [c.to_dict() for c in categories],
                 "settings": settings.to_dict()
             }
