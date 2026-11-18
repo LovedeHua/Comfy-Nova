@@ -1,9 +1,11 @@
 """
 从 ComfyUI 源码提取所有内置节点清单
 """
+import argparse
+import json
 import os
 import re
-import json
+import sys
 from pathlib import Path
 
 # ComfyUI 前端内置节点（不需要后端支持）
@@ -187,11 +189,68 @@ def scan_comfyui_source(comfyui_path):
     
     return all_nodes
 
-def main():
-    comfyui_path = r"g:\ComfyUI_windows_portable\ComfyUI"
+
+def parse_args(argv=None):
+    """解析命令行参数。
+
+    ComfyUI 根目录因机器而异，不能写死在源码里：写死盘符在别人的机器上
+    只会得到一个"扫不到任何节点"的空结果，而且不会报错。
+
+    Args:
+        argv: 参数列表，None 表示使用 sys.argv。
+
+    Returns:
+        argparse.Namespace: comfyui_path 与 output 均为命令行原始字符串，尚未校验。
+    """
+    parser = argparse.ArgumentParser(description="从 ComfyUI 源码提取内置节点清单")
+    parser.add_argument(
+        "--comfyui-path",
+        default=os.environ.get("COMFYUI_PATH", ""),
+        help="ComfyUI 源码根目录（也可用环境变量 COMFYUI_PATH 指定）",
+    )
+    parser.add_argument(
+        "--output",
+        default="comfyui_core_nodes.json",
+        help="输出 JSON 路径（默认 comfyui_core_nodes.json）",
+    )
+    return parser.parse_args(argv)
+
+
+def resolve_comfyui_path(raw_path):
+    """校验并返回 ComfyUI 源码根目录。
+
+    Args:
+        raw_path: 命令行或环境变量给出的路径字符串。
+
+    Returns:
+        Path: 已确认存在的 ComfyUI 根目录。
+
+    Raises:
+        SystemExit: 未提供路径、路径不存在、或目录里没有 nodes.py。
+    """
+    if not raw_path:
+        print("[错误] 未指定 ComfyUI 目录。", file=sys.stderr)
+        print("       请用 --comfyui-path <目录> 或设置环境变量 COMFYUI_PATH。", file=sys.stderr)
+        raise SystemExit(2)
+
+    comfyui_path = Path(raw_path).expanduser()
+    if not comfyui_path.is_dir():
+        print(f"[错误] 目录不存在: {comfyui_path}", file=sys.stderr)
+        raise SystemExit(2)
+    if not (comfyui_path / "nodes.py").is_file():
+        print(f"[错误] {comfyui_path} 下没有 nodes.py，可能不是 ComfyUI 源码根目录。", file=sys.stderr)
+        raise SystemExit(2)
+
+    return comfyui_path
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    comfyui_path = resolve_comfyui_path(args.comfyui_path)
     
     print("=" * 60)
     print("ComfyUI 内置节点提取工具")
+    print(f"源码目录: {comfyui_path}")
     print("=" * 60)
     
     all_nodes = {}
@@ -225,7 +284,7 @@ def main():
             print(f"  ... and {len(nodes) - 10} more")
     
     # 保存到 JSON
-    output_path = "comfyui_core_nodes.json"
+    output_path = Path(args.output)
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump({
             "version": "extracted",
@@ -235,6 +294,7 @@ def main():
         }, f, indent=2, ensure_ascii=False)
     
     print(f"\n已保存到: {output_path}")
+
 
 if __name__ == "__main__":
     main()
