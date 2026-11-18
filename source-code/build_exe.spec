@@ -35,6 +35,115 @@ for _src, _dst in [
     else:
         print(f"[spec] 跳过可选数据目录（不存在）: {_src}")
 
+# ============================================
+# .NET 8 源码预处理（必须在 Analysis 之前执行）
+#
+# PyInstaller 在 Analysis() 阶段就会收集 pywebview 的 lib DLL，并把
+# winforms.py 编译成字节码放进 PYZ。若这两段处理写在 Analysis 之后，
+# 改动只落在磁盘源文件上，首次构建（全新环境 / --clean 后缓存失效）
+# 产物内嵌的仍是未修补版本：OpenFolderDialog 反射 .NET Framework 内部
+# 类型，在 .NET 8 coreclr 下 import 阶段即抛 AttributeError，应用在
+# webview.start() 处静默崩溃。从第二次构建起源文件已被上次改过才恰好
+# 正常，问题极具迷惑性。故整体前移，首次构建即生效。
+#
+# 分两段：先替换 WebView2 DLL（让 hook 收集正确版本），再修补 winforms.py 源码。
+
+# --- 第一段：确保 pywebview lib 目录里是 netcoreapp3.0 版本的 WebView2 DLL ---
+# 直接替换源文件，让 PyInstaller hook 自然收集正确的版本
+import shutil as _shutil
+
+_netcore_dir = os.path.join('backend', 'lib', 'webview2_netcore')
+_webview_lib = os.path.join(os.path.abspath('.'), '.venv', 'Lib', 'site-packages', 'webview', 'lib')
+
+if os.path.isdir(_webview_lib) and os.path.isdir(_netcore_dir):
+    for _dll in ['Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll']:
+        _src = os.path.join(_netcore_dir, _dll)
+        _dst = os.path.join(_webview_lib, _dll)
+        if os.path.exists(_src):
+            _shutil.copy2(_src, _dst)
+            print(f"[spec] .NET 8: copied netcoreapp3.0 {_dll} to pywebview lib")
+
+    # 清理 .bak 备份文件
+    for _f in os.listdir(_webview_lib):
+        if _f.endswith('.bak'):
+            os.remove(os.path.join(_webview_lib, _f))
+            print(f"[spec] .NET 8: removed {_f}")
+
+# --- 第二段：直接 patch venv 中 pywebview 的 winforms.py ---
+# 该类的 OpenFolderDialog 使用反射访问 .NET Framework 内部类型，在 .NET 8 下不存在
+# 必须在打包前 patch 源文件，因为 PyInstaller 会编译 .pyc 打包进去
+import site
+_winforms_candidates = [
+    os.path.join(os.path.abspath('.'), '.venv', 'Lib', 'site-packages', 'webview', 'platforms', 'winforms.py'),
+]
+# 也搜索 site-packages
+for sp in site.getsitepackages() if hasattr(site, 'getsitepackages') else []:
+    _winforms_candidates.append(os.path.join(sp, 'webview', 'platforms', 'winforms.py'))
+
+for _wf_path in _winforms_candidates:
+    if os.path.exists(_wf_path):
+        with open(_wf_path, 'r', encoding='utf-8') as _f:
+            _wf_content = _f.read()
+        
+        if '# PATCHED_FOR_DOTNET8' in _wf_content:
+            print(f"[spec] .NET 8: winforms.py already patched: {_wf_path}")
+            break
+        
+        _modified = False
+
+        # Patch 1: 修复 _is_chromium 检测（精简版 Windows 没有 .NET Framework 注册表键）
+        _old_is_chromium = "is_chromium = not is_cef and _is_chromium() and forced_gui_ != 'mshtml'"
+        _new_is_chromium = "is_chromium = not is_cef and (forced_gui_ == 'edgechromium' or _is_chromium()) and forced_gui_ != 'mshtml'  # PATCHED_FOR_DOTNET8"
+        if _old_is_chromium in _wf_content:
+            _wf_content = _wf_content.replace(_old_is_chromium, _new_is_chromium)
+            _modified = True
+            print(f"[spec] .NET 8: Patched _is_chromium detection")
+
+        # Patch 2: 替换 OpenFolderDialog
+        if 'FileDialogNative+IFileDialog' in _wf_content:
+            _marker = "class OpenFolderDialog:"
+            if _marker in _wf_content:
+                _idx = _wf_content.index(_marker)
+                _rest = _wf_content[_idx:]
+                _lines = _rest.split('\n')
+                _end = len(_lines)
+                for _li, _ln in enumerate(_lines[1:], 1):
+                    _s = _ln.strip()
+                    if _ln and not _ln[0].isspace() and _s and not _s.startswith('#'):
+                        _end = _li
+                        break
+                
+                _repl = '''class OpenFolderDialog:  # PATCHED_FOR_DOTNET8
+    """Folder dialog compatible with .NET 8"""
+    foldersFilter = 'Folders|\\n'
+
+    @classmethod
+    def show(cls, parent=None, initialDirectory=None, allow_multiple=False, title=None):
+        dialog = WinForms.FolderBrowserDialog()
+        if initialDirectory:
+            dialog.SelectedPath = initialDirectory
+        if title:
+            dialog.Description = title
+        result = dialog.ShowDialog()
+        if result == WinForms.DialogResult.OK:
+            return (dialog.SelectedPath,)
+        return None
+
+'''
+                _wf_content = _wf_content[:_idx] + _repl + '\n'.join(_lines[_end:])
+                _modified = True
+                print(f"[spec] .NET 8: Patched OpenFolderDialog")
+
+        if _modified:
+            with open(_wf_path, 'w', encoding='utf-8') as _f:
+                _f.write(_wf_content)
+            _pycache = os.path.join(os.path.dirname(_wf_path), '__pycache__')
+            if os.path.exists(_pycache):
+                import shutil
+                shutil.rmtree(_pycache, ignore_errors=True)
+            print(f"[spec] .NET 8: winforms.py patched: {_wf_path}")
+        break
+
 a = Analysis(
     ['backend/main.py'],
     pathex=[os.path.abspath('.')],
@@ -181,109 +290,11 @@ def filter_bloat(items_list, item_type='datas'):
 a.datas = filter_bloat(a.datas, 'datas')
 a.binaries = filter_bloat(a.binaries, 'binaries')
 
-# ============================================
-# .NET 8 coreclr: 确保 pywebview lib 目录里是 netcoreapp3.0 版本的 WebView2 DLL
-# 直接替换源文件，让 PyInstaller hook 自然收集正确的版本
-# ============================================
-import shutil as _shutil
-
-_netcore_dir = os.path.join('backend', 'lib', 'webview2_netcore')
-_webview_lib = os.path.join(os.path.abspath('.'), '.venv', 'Lib', 'site-packages', 'webview', 'lib')
-
-if os.path.isdir(_webview_lib) and os.path.isdir(_netcore_dir):
-    for _dll in ['Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll']:
-        _src = os.path.join(_netcore_dir, _dll)
-        _dst = os.path.join(_webview_lib, _dll)
-        if os.path.exists(_src):
-            _shutil.copy2(_src, _dst)
-            print(f"[spec] .NET 8: copied netcoreapp3.0 {_dll} to pywebview lib")
-
-    # 清理 .bak 备份文件
-    for _f in os.listdir(_webview_lib):
-        if _f.endswith('.bak'):
-            os.remove(os.path.join(_webview_lib, _f))
-            print(f"[spec] .NET 8: removed {_f}")
 
 # 排除 .bak 文件（以防万一）
 a.binaries = [item for item in a.binaries if not item[0].endswith('.bak')]
 a.datas = [item for item in a.datas if not item[0].endswith('.bak')]
 
-# ============================================
-# .NET 8 coreclr: 直接 patch venv 中 pywebview 的 winforms.py
-# 该类的 OpenFolderDialog 使用反射访问 .NET Framework 内部类型，在 .NET 8 下不存在
-# 必须在打包前 patch 源文件，因为 PyInstaller 会编译 .pyc 打包进去
-# ============================================
-import site
-_winforms_candidates = [
-    os.path.join(os.path.abspath('.'), '.venv', 'Lib', 'site-packages', 'webview', 'platforms', 'winforms.py'),
-]
-# 也搜索 site-packages
-for sp in site.getsitepackages() if hasattr(site, 'getsitepackages') else []:
-    _winforms_candidates.append(os.path.join(sp, 'webview', 'platforms', 'winforms.py'))
-
-for _wf_path in _winforms_candidates:
-    if os.path.exists(_wf_path):
-        with open(_wf_path, 'r', encoding='utf-8') as _f:
-            _wf_content = _f.read()
-        
-        if '# PATCHED_FOR_DOTNET8' in _wf_content:
-            print(f"[spec] .NET 8: winforms.py already patched: {_wf_path}")
-            break
-        
-        _modified = False
-
-        # Patch 1: 修复 _is_chromium 检测（精简版 Windows 没有 .NET Framework 注册表键）
-        _old_is_chromium = "is_chromium = not is_cef and _is_chromium() and forced_gui_ != 'mshtml'"
-        _new_is_chromium = "is_chromium = not is_cef and (forced_gui_ == 'edgechromium' or _is_chromium()) and forced_gui_ != 'mshtml'  # PATCHED_FOR_DOTNET8"
-        if _old_is_chromium in _wf_content:
-            _wf_content = _wf_content.replace(_old_is_chromium, _new_is_chromium)
-            _modified = True
-            print(f"[spec] .NET 8: Patched _is_chromium detection")
-
-        # Patch 2: 替换 OpenFolderDialog
-        if 'FileDialogNative+IFileDialog' in _wf_content:
-            _marker = "class OpenFolderDialog:"
-            if _marker in _wf_content:
-                _idx = _wf_content.index(_marker)
-                _rest = _wf_content[_idx:]
-                _lines = _rest.split('\n')
-                _end = len(_lines)
-                for _li, _ln in enumerate(_lines[1:], 1):
-                    _s = _ln.strip()
-                    if _ln and not _ln[0].isspace() and _s and not _s.startswith('#'):
-                        _end = _li
-                        break
-                
-                _repl = '''class OpenFolderDialog:  # PATCHED_FOR_DOTNET8
-    """Folder dialog compatible with .NET 8"""
-    foldersFilter = 'Folders|\\n'
-
-    @classmethod
-    def show(cls, parent=None, initialDirectory=None, allow_multiple=False, title=None):
-        dialog = WinForms.FolderBrowserDialog()
-        if initialDirectory:
-            dialog.SelectedPath = initialDirectory
-        if title:
-            dialog.Description = title
-        result = dialog.ShowDialog()
-        if result == WinForms.DialogResult.OK:
-            return (dialog.SelectedPath,)
-        return None
-
-'''
-                _wf_content = _wf_content[:_idx] + _repl + '\n'.join(_lines[_end:])
-                _modified = True
-                print(f"[spec] .NET 8: Patched OpenFolderDialog")
-
-        if _modified:
-            with open(_wf_path, 'w', encoding='utf-8') as _f:
-                _f.write(_wf_content)
-            _pycache = os.path.join(os.path.dirname(_wf_path), '__pycache__')
-            if os.path.exists(_pycache):
-                import shutil
-                shutil.rmtree(_pycache, ignore_errors=True)
-            print(f"[spec] .NET 8: winforms.py patched: {_wf_path}")
-        break
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
