@@ -1134,9 +1134,28 @@ def main():
             with _exit_lock:
                 _dialog_pending = True
                 _dialog_shown = False
-            threading.Timer(0.1, lambda: window.evaluate_js(
-                'window.triggerCloseDialog && window.triggerCloseDialog()'
-            )).start()
+
+            def _show_close_dialog():
+                """延迟触发前端关闭确认框。
+
+                evaluate_js 抛异常（窗口正在销毁、前端 JS 未就绪等）时必须复位
+                _dialog_pending，否则该标志永久为 True：之后每次系统关闭请求都会
+                命中"确认框处理中，本次关闭事件已忽略"而被吞掉。也不要依赖 4 秒
+                兜底——那条路径会直接强制退出，等于在弹窗没显示的情况下关掉用户
+                的应用。复位后窗口保留，用户可重新发起关闭（前端 X 按钮不受影响）。
+                """
+                nonlocal _dialog_pending
+
+                try:
+                    window.evaluate_js(
+                        'window.triggerCloseDialog && window.triggerCloseDialog()'
+                    )
+                except Exception as trigger_error:
+                    with _exit_lock:
+                        _dialog_pending = False
+                    logger.error(f"[Closing] 触发关闭确认框失败，已复位待处理标志: {trigger_error}")
+
+            threading.Timer(0.1, _show_close_dialog).start()
             threading.Timer(4.0, _dialog_timeout_guard).start()
             return False
         except Exception as e:
