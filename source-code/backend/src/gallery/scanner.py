@@ -374,32 +374,35 @@ class GalleryScanner:
         从文件夹结构同步分类（递归扫描所有层级）
         子文件夹自动成为分类，支持多级嵌套
         """
-        existing_categories = {c.folder_path: c for c in gallery_storage.get_categories() if c.folder_path}
-        found_folder_paths = set()
+        # 每个子目录都会 add_category 一次，逐条落盘会让分类同步变成 O(M^2)。
+        # 与资产扫描一样，整批包进一次 batch_updates。
+        with gallery_storage.batch_updates():
+            existing_categories = {c.folder_path: c for c in gallery_storage.get_categories() if c.folder_path}
+            found_folder_paths = set()
 
-        def scan_directory(current_dir: Path, relative_path: str, parent_category_id: Optional[str] = None):
-            """递归扫描目录"""
-            for item in current_dir.iterdir():
-                if item.is_dir():
-                    current_relative_path = f"{relative_path}/{item.name}" if relative_path else item.name
-                    found_folder_paths.add(current_relative_path)
+            def scan_directory(current_dir: Path, relative_path: str, parent_category_id: Optional[str] = None):
+                """递归扫描目录"""
+                for item in current_dir.iterdir():
+                    if item.is_dir():
+                        current_relative_path = f"{relative_path}/{item.name}" if relative_path else item.name
+                        found_folder_paths.add(current_relative_path)
 
-                    if current_relative_path not in existing_categories:
-                        category = gallery_storage.add_category(
-                            name=item.name,
-                            parent_id=parent_category_id,
-                            folder_path=current_relative_path
-                        )
-                    else:
-                        category = existing_categories[current_relative_path]
+                        if current_relative_path not in existing_categories:
+                            category = gallery_storage.add_category(
+                                name=item.name,
+                                parent_id=parent_category_id,
+                                folder_path=current_relative_path
+                            )
+                        else:
+                            category = existing_categories[current_relative_path]
 
-                    scan_directory(item, current_relative_path, category.id)
+                        scan_directory(item, current_relative_path, category.id)
 
-        scan_directory(library_dir, "", None)
+            scan_directory(library_dir, "", None)
 
-        for folder_path, category in existing_categories.items():
-            if folder_path not in found_folder_paths:
-                gallery_storage.delete_category(category.id)
+            for folder_path, category in existing_categories.items():
+                if folder_path not in found_folder_paths:
+                    gallery_storage.delete_category(category.id)
 
     def _find_media_files(self, directory: Path):
         """递归查找媒体文件"""
