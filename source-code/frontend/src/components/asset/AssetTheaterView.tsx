@@ -12,6 +12,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronLeft,
+  ChevronUp,
   ChevronRight,
   Copy,
   Download,
@@ -111,6 +112,9 @@ export function AssetTheaterView({
   // 原图是否已加载完成：切换资产时必须复位，否则会沿用上一张的 true 导致
   // 新图直接以"已加载"外观出现，实际还在下载。
   const [isFullLoaded, setIsFullLoaded] = useState(false)
+  // 悬浮栏收起状态：收起后仅顶部中间留一个鼠标靠近才显现的箭头
+  const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false)
+  const [isArrowHover, setIsArrowHover] = useState(false)
   const [scaleLabel, setScaleLabel] = useState(1)
 
   const {
@@ -557,7 +561,10 @@ export function AssetTheaterView({
           <div
             className={cn(
               'absolute left-1/2 top-0 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-b-md',
-              'border border-x-0 border-t-0 border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75'
+              'border border-x-0 border-t-0 border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
+              // 收起时整体上滑出屏幕（把自身高度 + 圆角全部推上去）
+              'transition-[transform,opacity] duration-200',
+              isToolbarCollapsed ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
             )}
           >
             <Button
@@ -640,6 +647,41 @@ export function AssetTheaterView({
             >
               <X className="size-3.5" />
             </Button>
+          </div>
+
+          {/* 收起/展开把手：悬浮栏可见时是"收起"；收起后固定顶部中间，
+              鼠标靠近才显现。独立于工具条，不随其滑出。 */}
+          {/* 顶部热区：收起状态下鼠标靠近顶部才显现箭头 */}
+          <div
+            className={cn(
+              'absolute left-1/2 top-0 z-30 h-5 -translate-x-1/2 w-40',
+              // 热区自身不可见不拦截工具条点击（收起时才需要）
+              !isToolbarCollapsed && 'pointer-events-none'
+            )}
+            onMouseEnter={() => setIsArrowHover(true)}
+            onMouseLeave={() => setIsArrowHover(false)}
+          >
+          <button
+              type="button"
+              onClick={() => setIsToolbarCollapsed((v) => !v)}
+              aria-label={isToolbarCollapsed ? t('asset.theater.showToolbar') : t('asset.theater.hideToolbar')}
+              title={isToolbarCollapsed ? t('asset.theater.showToolbar') : t('asset.theater.hideToolbar')}
+              className={cn(
+                // 位置：固定顶部中间，与工具条同轴
+                'absolute left-1/2 top-0 z-30 -translate-x-1/2 flex items-center justify-center pointer-events-auto',
+                // 形态：小巧胶囊，向下开口的把手
+                'size-8 rounded-b-lg border border-x-0 border-t-0 border-border-subtle bg-surface/60',
+                'text-muted-foreground transition-all duration-200 hover:bg-surface/80 hover:text-foreground',
+                // 收起时：平时隐形，鼠标进入顶部热区才显现
+                isToolbarCollapsed
+                  ? (isArrowHover ? 'opacity-100' : 'opacity-0')
+                  : 'opacity-100'
+              )}
+            >
+              {isToolbarCollapsed
+                ? <ChevronDown className="size-3.5" />
+                : <ChevronUp className="size-3.5" />}
+            </button>
           </div>
         </div>
 
