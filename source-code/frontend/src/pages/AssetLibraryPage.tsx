@@ -4,6 +4,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback, useRef, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation, useNavigate } from 'react-router'
 import { Folder, ChevronRight } from 'lucide-react'
 import {
   AssetToolbar,
@@ -55,6 +56,8 @@ interface ContextMenuState {
 }
 
 export default function AssetLibraryPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const { t } = useTranslation()
   const {
     loadData,
@@ -456,33 +459,38 @@ export default function AssetLibraryPage() {
     return gridRef.current?.getCardRefs() ?? new Map()
   }, [])
 
-  // 桌面环境的"后退"来自鼠标侧键或 Alt+Left（React Router 独占 history，
-  // 手工 pushState 占位会被其覆盖，popstate 拦截在页面层不可行）。
-  // 信息面板打开时，这两种后退操作转为关闭信息面板。
+  // 后退关闭信息面板（RR 导航栈方案）：
+  // 面板打开时压一条"面板占位"导航（同路径 push + sentinel state）；
+  // 用户后退（WebView2 把鼠标侧键/Alt+Left 映射为 history.back）时
+  // RR 回退一格、sentinel 消失 —— 用 ref 检测"sentinel 从有到无"的转换
+  // 即后退信号，关闭面板。两个动作在同一 effect 串行处理，避免竞态：
+  // 压占位 effect 与关面板 effect 分离时，popstate 后的重渲染顺序不定，
+  // 会出现"关面板后重新压占位"或"后退信号被吞"的竞态（实测踩过）。
+  const hadSentinelRef = useRef(false)
   useEffect(() => {
     if (theaterAsset) return
     const isPanelOpen = infoPanelPinned || !!selectedInfoAsset
-    if (!isPanelOpen) return
-    const closePanel = (event: Event | KeyboardEvent) => {
-      event.preventDefault()
-      // 固定态下"关闭"= 取消固定并清空当前资产；悬浮态下只清资产
+    const sentinel = !!location.state?.infoPanelSentinel
+
+    // 后退信号：上一轮有 sentinel、这一轮没有（且不是我们自己消费的）
+    if (hadSentinelRef.current && !sentinel && isPanelOpen) {
+      hadSentinelRef.current = false
       if (infoPanelPinned) setInfoPanelPinned(false)
       setSelectedInfoAsset(null)
+      return
     }
-    const handleMouseDown = (event: MouseEvent) => {
-      // 3 = 鼠标后退侧键
-      if (event.button === 3) closePanel(event)
+    hadSentinelRef.current = sentinel
+
+    if (!isPanelOpen) {
+      // 面板已关：占位还在栈上就消费掉
+      if (sentinel) navigate(-1)
+      return
     }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.altKey && event.key === 'ArrowLeft') closePanel(event)
+    // 面板开着且栈顶没有占位 → 压一条
+    if (!sentinel) {
+      navigate(location.pathname, { state: { infoPanelSentinel: true } })
     }
-    window.addEventListener('mousedown', handleMouseDown)
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('mousedown', handleMouseDown)
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [infoPanelPinned, selectedInfoAsset, theaterAsset])
+  }, [infoPanelPinned, selectedInfoAsset, theaterAsset, location.state, location.pathname, navigate])
 
   // 点击页面空白区域关闭悬浮 info 面板
   const handlePageClick = useCallback((e: React.MouseEvent) => {

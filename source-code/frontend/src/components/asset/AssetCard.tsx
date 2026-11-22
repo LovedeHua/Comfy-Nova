@@ -31,6 +31,9 @@ interface AssetCardProps {
   variant?: 'masonry' | 'grid'
 }
 
+/** 已完成加载的缩略图 URL 集合：跨挂载去重的加载状态，防重挂载闪白 */
+const loadedThumbnails = new Set<string>()
+
 const AssetCardBase = forwardRef<HTMLDivElement, AssetCardProps>(
   function AssetCard(
     {
@@ -48,11 +51,11 @@ const AssetCardBase = forwardRef<HTMLDivElement, AssetCardProps>(
     const { selectedAssetIds, toggleAssetSelection, updatePreviewBlurred, pushImageToComfyUI } = useAssetStore()
     const { comfyUIStatus, showWorkspaceIframe } = useProcessStore()
     const { success, warning, error } = useToast()
-    const [isLoaded, setIsLoaded] = useState(false)
-    // 单元格复用切换资产时重置加载态；已缓存图片由 img ref 的 complete 检查立即恢复
-    useEffect(() => {
-      setIsLoaded(false)
-    }, [asset.id, asset.thumbnail])
+    // 已成功加载过的缩略图 URL 记在模块级缓存：单元格复用/卡片重挂载时，
+    // 同一图片直接显示（首帧就是 opacity-100），彻底消除"重挂载闪白"。
+    // 不同资产切换时仍未加载的新图才走 opacity-0 → onLoad 淡入。
+    const thumbnail = asset.thumbnail ?? ''
+    const [isLoaded, setIsLoaded] = useState(() => loadedThumbnails.has(thumbnail))
     const [isLocalDragging, setIsLocalDragging] = useState(false)
     const [isPushing, setIsPushing] = useState(false)
     
@@ -268,9 +271,16 @@ const AssetCardBase = forwardRef<HTMLDivElement, AssetCardProps>(
             // 缓存命中的图片 complete 已为 true，onLoad 可能不再触发；
             // 挂载/复用单元格时立即检查，避免已缓存图片闪白
             ref={(el) => {
-              if (el && el.complete && el.naturalWidth > 0) setIsLoaded(true)
+              // 缓存命中的图片 complete 已为 true，onLoad 可能不再触发
+              if (el && el.complete && el.naturalWidth > 0) {
+                loadedThumbnails.add(thumbnail)
+                setIsLoaded(true)
+              }
             }}
-            onLoad={() => setIsLoaded(true)}
+            onLoad={() => {
+              loadedThumbnails.add(thumbnail)
+              setIsLoaded(true)
+            }}
             className={cn(
               'absolute inset-0 size-full object-cover transition-opacity duration-300',
               isLoaded ? 'opacity-100' : 'opacity-0',
