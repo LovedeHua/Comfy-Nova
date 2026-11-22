@@ -49,6 +49,10 @@ const AssetCardBase = forwardRef<HTMLDivElement, AssetCardProps>(
     const { comfyUIStatus, showWorkspaceIframe } = useProcessStore()
     const { success, warning, error } = useToast()
     const [isLoaded, setIsLoaded] = useState(false)
+    // 单元格复用切换资产时重置加载态；已缓存图片由 img ref 的 complete 检查立即恢复
+    useEffect(() => {
+      setIsLoaded(false)
+    }, [asset.id, asset.thumbnail])
     const [isLocalDragging, setIsLocalDragging] = useState(false)
     const [isPushing, setIsPushing] = useState(false)
     
@@ -261,6 +265,11 @@ const AssetCardBase = forwardRef<HTMLDivElement, AssetCardProps>(
             loading="lazy"
             // 缩略图解码移出主线程，网格里几百张同时进视口时不会卡住滚动
             decoding="async"
+            // 缓存命中的图片 complete 已为 true，onLoad 可能不再触发；
+            // 挂载/复用单元格时立即检查，避免已缓存图片闪白
+            ref={(el) => {
+              if (el && el.complete && el.naturalWidth > 0) setIsLoaded(true)
+            }}
             onLoad={() => setIsLoaded(true)}
             className={cn(
               'absolute inset-0 size-full object-cover transition-opacity duration-300',

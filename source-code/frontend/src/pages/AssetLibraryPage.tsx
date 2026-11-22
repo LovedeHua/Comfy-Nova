@@ -456,6 +456,34 @@ export default function AssetLibraryPage() {
     return gridRef.current?.getCardRefs() ?? new Map()
   }, [])
 
+  // 桌面环境的"后退"来自鼠标侧键或 Alt+Left（React Router 独占 history，
+  // 手工 pushState 占位会被其覆盖，popstate 拦截在页面层不可行）。
+  // 信息面板打开时，这两种后退操作转为关闭信息面板。
+  useEffect(() => {
+    if (theaterAsset) return
+    const isPanelOpen = infoPanelPinned || !!selectedInfoAsset
+    if (!isPanelOpen) return
+    const closePanel = (event: Event | KeyboardEvent) => {
+      event.preventDefault()
+      // 固定态下"关闭"= 取消固定并清空当前资产；悬浮态下只清资产
+      if (infoPanelPinned) setInfoPanelPinned(false)
+      setSelectedInfoAsset(null)
+    }
+    const handleMouseDown = (event: MouseEvent) => {
+      // 3 = 鼠标后退侧键
+      if (event.button === 3) closePanel(event)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey && event.key === 'ArrowLeft') closePanel(event)
+    }
+    window.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [infoPanelPinned, selectedInfoAsset, theaterAsset])
+
   // 点击页面空白区域关闭悬浮 info 面板
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (theaterAsset) return
