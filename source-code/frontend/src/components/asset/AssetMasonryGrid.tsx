@@ -156,7 +156,7 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
     if (filteredAssets.length === 0) {
       if (folderItems.length > 0) {
         return (
-          <div ref={containerRef} className="p-6">
+          <div ref={containerRef} className="min-w-0 p-6">
             <div className="grid gap-5" style={folderGridStyle}>
               {folderItems.map((item) => (
                 <AssetFolderCard
@@ -196,9 +196,9 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
         )}
 
         {filteredAssets.length > 0 && (
-          <div className="flex gap-5">
+          <div className="flex min-w-0 gap-5">
             {columns.map((column, colIndex) => (
-              <div key={colIndex} className="flex flex-1 flex-col gap-5">
+              <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-5">
                 {column.map((asset) => (
                   <div
                     key={asset.id}
