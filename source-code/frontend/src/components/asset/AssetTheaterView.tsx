@@ -644,13 +644,6 @@ export function AssetTheaterView({
               )
             })}
 
-            <div className="mx-1 h-4 w-px bg-border-subtle" />
-
-
-
-            <div className="mx-1 h-4 w-px bg-border-subtle" />
-
-            <div className="mx-1 h-4 w-px bg-border-subtle" />
             <Button
               variant="ghost"
               size="icon"
