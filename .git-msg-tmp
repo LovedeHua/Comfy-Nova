@@ -1,0 +1,6 @@
+feat(theater): 工具条改圆角矩形，Backspace/浏览器后退关闭影院
+
+- 悬浮栏 rounded-full -> rounded-xl，内部按钮同步改 rounded-lg
+- Backspace 语义上的后退：影院模式下直接退出（与 Esc 一致）
+- 进入影院时 pushState 占位，popstate（鼠标侧键/浏览器后退）拦截为关闭影院，
+  避免后退把整个应用路由弹走

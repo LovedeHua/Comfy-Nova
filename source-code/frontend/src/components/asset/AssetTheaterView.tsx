@@ -164,6 +164,10 @@ export function AssetTheaterView({
         case 'ArrowRight':
           goNext()
           break
+        // Backspace / Backspace 别名：用户语义里的"后退"，在影院模式下就是退出
+        case 'Backspace':
+          onClose()
+          break
         case 'Escape':
           onClose()
           break
@@ -189,6 +193,21 @@ export function AssetTheaterView({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [goPrev, goNext, onClose, zoomTo, resetZoom, transform.scale])
+
+  // 鼠标侧键/浏览器后退：进入影院时压一条 history 占位，后退事件被拦截后
+  // 转为关闭影院。否则后退会把整个应用路由弹走，而用户预期只是退出全屏浮层。
+  useEffect(() => {
+    if (typeof window.history.pushState !== 'function') return
+    window.history.pushState({ theater: true }, '')
+    const handlePopState = () => onClose()
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      // 组件卸载时若占位还在历史里（用户用 Esc/关闭按钮退出的情形），
+      // 后退一格把它消费掉，保证历史栈不残留
+      if (window.history.state?.theater) window.history.back()
+    }
+  }, [onClose])
 
   // 轨道跟随当前资产滚动
   useEffect(() => {
@@ -499,7 +518,7 @@ export function AssetTheaterView({
               避免四角各飘一块遮挡画面。鼠标静止后淡出，移动即恢复。 */}
           <div
             className={cn(
-              'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-full',
+              'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-xl',
               'border border-border-subtle bg-surface/70 px-1.5 py-1 text-xs shadow-soft-lg',
               'backdrop-blur-md transition-opacity duration-300',
               controlsVisible ? 'opacity-100' : 'opacity-0',
@@ -512,7 +531,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={() => void toggleFavorite(asset.id)}
               title={t('asset.batchFavorite')}
-              className={cn('size-7 rounded-full', asset.isFavorite && 'text-warning')}
+              className={cn('size-7 rounded-lg', asset.isFavorite && 'text-warning')}
             >
               <Star className={cn('size-3.5', asset.isFavorite && 'fill-current')} />
             </Button>
@@ -530,7 +549,7 @@ export function AssetTheaterView({
                   size="icon"
                   onClick={() => zoomTo(transform.scale / 1.25)}
                   title={t('asset.theater.zoomOut')}
-                  className="size-7 rounded-full"
+                  className="size-7 rounded-lg"
                 >
                   <ZoomOut className="size-3.5" />
                 </Button>
@@ -547,7 +566,7 @@ export function AssetTheaterView({
                   size="icon"
                   onClick={() => zoomTo(transform.scale * 1.25)}
                   title={t('asset.theater.zoomIn')}
-                  className="size-7 rounded-full"
+                  className="size-7 rounded-lg"
                 >
                   <ZoomIn className="size-3.5" />
                 </Button>
@@ -567,7 +586,7 @@ export function AssetTheaterView({
                   onClick={() => toggleChrome(region)}
                   title={`${t(isHidden ? "asset.theater.chrome.show" : "asset.theater.chrome.hide")} ${t(`asset.theater.chrome.${region}`)}`}
                   className={cn(
-                    'size-7 rounded-full',
+                    'size-7 rounded-lg',
                     isHidden ? 'text-muted-foreground' : 'text-foreground'
                   )}
                 >
@@ -583,7 +602,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={onClose}
               title={t('asset.theater.exitHint')}
-              className="size-7 rounded-full"
+              className="size-7 rounded-lg"
             >
               <X className="size-3.5" />
             </Button>
