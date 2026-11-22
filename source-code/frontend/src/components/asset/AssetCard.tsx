@@ -2,7 +2,7 @@
  * 资产卡片组件
  */
 
-import { forwardRef, useState, useCallback, useRef, useEffect } from 'react'
+import { forwardRef, memo, useState, useCallback, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Check, Eye, EyeOff, Maximize2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -15,18 +15,35 @@ import { cn } from '@/lib/utils'
 
 interface AssetCardProps {
   asset: Asset
-  onClick?: () => void
-  onDoubleClick?: () => void
+  /**
+   * 父级传入的稳定回调（引用只随父级自身依赖变化，不随每张卡片变化）。
+   * 卡片内部自己绑定 asset，这样父组件重渲染时传给 N 张卡的 props 引用不变，
+   * memo 才能真正生效；此前父级用 onClick={() => onImageClick?.(asset)} 在
+   * 渲染期内新建箭头函数，任何 memo 都会被这 4 个新引用全部击穿。
+   */
+  onImageClick?: (asset: Asset) => void
+  onImageDoubleClick?: (asset: Asset) => void
   /** 显式进入影院模式；不传时仅能用双击触发 */
-  onView?: () => void
-  onContextMenu?: (e: React.MouseEvent) => void
+  onView?: (asset: Asset) => void
+  onImageContextMenu?: (e: React.MouseEvent, asset: Asset) => void
   isBatchMode?: boolean
   /** masonry：瀑布流，按原图比例撑高；grid：网格，固定方形缩略图 */
   variant?: 'masonry' | 'grid'
 }
 
-export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
-  function AssetCard({ asset, onClick, onDoubleClick, onView, onContextMenu, isBatchMode, variant = 'masonry' }, ref) {
+const AssetCardBase = forwardRef<HTMLDivElement, AssetCardProps>(
+  function AssetCard(
+    {
+      asset,
+      onImageClick,
+      onImageDoubleClick,
+      onView,
+      onImageContextMenu,
+      isBatchMode,
+      variant = 'masonry'
+    },
+    ref
+  ) {
     const { t } = useTranslation()
     const { selectedAssetIds, toggleAssetSelection, updatePreviewBlurred, pushImageToComfyUI } = useAssetStore()
     const { comfyUIStatus, showWorkspaceIframe } = useProcessStore()
@@ -65,7 +82,7 @@ export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
       if (isBatchMode && !isDragTriggeredRef.current) {
         toggleAssetSelection(asset.id)
       } else if (!isBatchMode) {
-        onClick?.()
+        onImageClick?.(asset)
       }
     }
 
@@ -138,7 +155,7 @@ export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
 
     const handleView = (e: React.MouseEvent) => {
       e.stopPropagation()
-      onView?.()
+      onView?.(asset)
     }
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -224,8 +241,10 @@ export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
           isSelected && 'ring-2 ring-success ring-offset-2 ring-offset-background',
           isVisualDragging && 'opacity-50 scale-[0.98] border-primary ring-2 ring-primary/30'
         )}
-        onDoubleClick={onDoubleClick}
-        onContextMenu={onContextMenu}
+        onDoubleClick={onImageDoubleClick ? () => onImageDoubleClick(asset) : undefined}
+        onContextMenu={
+          onImageContextMenu ? (e) => onImageContextMenu(e, asset) : undefined
+        }
         onClick={handleClick}
         onMouseDown={handleMouseDown}
       >
@@ -240,6 +259,8 @@ export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
             src={asset.thumbnail}
             alt={asset.filename}
             loading="lazy"
+            // 缩略图解码移出主线程，网格里几百张同时进视口时不会卡住滚动
+            decoding="async"
             onLoad={() => setIsLoaded(true)}
             className={cn(
               'absolute inset-0 size-full object-cover transition-opacity duration-300',
@@ -347,3 +368,11 @@ export const AssetCard = forwardRef<HTMLDivElement, AssetCardProps>(
     )
   }
 )
+
+/**
+ * 卡片渲染成本高（缩略图、浮层按钮、拖拽与选中态），而列表里通常有几百上千张。
+ * memo 只在 props 引用变化时才重渲染：父级传 useCallback 包过的稳定回调，
+ * 卡片内部按 asset 绑定，因此选中某一张或滚动时不会连带重渲染全部卡片。
+ */
+export const AssetCard = memo(AssetCardBase)
+export default AssetCard

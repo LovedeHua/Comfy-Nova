@@ -55,6 +55,10 @@ class GalleryController:
         try:
             # 历史视频资产缺少内嵌提示词，首次取列表时补一次（进程内幂等）
             gallery_scanner.backfill_video_metadata()
+            # 图片缩略图交给后台线程补齐，不阻塞列表返回：单张约 40 ms，
+            # 几千张同步跑会让进资产库要等几分钟。缺少缩略图期间路由回原图，
+            # 只是加载慢，功能不受影响；补齐后自动恢复轻量路径。
+            gallery_scanner.start_thumbnail_backfill()
 
             assets = gallery_storage.get_assets()
             categories = gallery_storage.get_categories()
@@ -1237,7 +1241,12 @@ class GalleryController:
             }
             mimetype = mimetype_map.get(ext, 'image/jpeg')
 
-            return send_file(str(file_path), mimetype=mimetype)
+            response = send_file(str(file_path), mimetype=mimetype)
+            # 缩略图文件名带内容哈希，内容不会变。给一年强缓存，
+            # 来回切换/重进页面时浏览器直接复用已解码的位图，
+            # 不再重新请求与解码——这是滚动流畅度的关键一环。
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            return response
         except Exception as e:
             logger.error(f"[GalleryController] 获取缩略图失败：{e}")
             return None
@@ -1276,12 +1285,19 @@ class GalleryController:
             mimetype = mimetype_map.get(ext, 'application/octet-stream')
 
             is_video = ext in ['.mp4', '.webm']
-            
-            return send_file(
+
+            # 原图可能被外部编辑器/生成流程改写，用条件请求（ETag/Last-Modified）
+            # 而不是强制缓存：命中 304 时省掉传输，文件变了又能立刻取到新内容。
+            # 之前 conditional 只对视频开启，图片每次都全量重传。
+            response = send_file(
                 str(file_path),
                 mimetype=mimetype,
-                conditional=is_video
+                conditional=True,
+                etag=True,
+                last_modified=file_path.stat().st_mtime
             )
+            response.headers['Cache-Control'] = 'private, max-age=60, must-revalidate'
+            return response
         except Exception as e:
             logger.error(f"[GalleryController] 获取原图失败：{e}")
             return None

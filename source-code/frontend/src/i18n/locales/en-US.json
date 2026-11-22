@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Comfyui-Box",
+    "name": "Comfy-Nova",
     "title": "ComfyUI Management Platform"
   },
   "common": {
@@ -425,7 +425,7 @@
     }
   },
   "home": {
-    "title": "Welcome to Comfyui-Box",
+    "title": "Welcome to Comfy-Nova",
     "subtitle": "Modern ComfyUI Management Tool",
     "systemStatus": "System Status",
     "currentEnv": "Current Environment",
@@ -591,7 +591,7 @@
     "saveButton": "Save Configuration",
     "continueEditing": "Continue Editing",
     "discardChanges": "Discard Changes",
-    "saveBeforeSwitch": "You have unsaved changes. Switching environment will lose these changes.",
+    "saveBeforeSwitch": "You have unsaved changes, save before switching env?",
     "message": {
       "noEnvironment": "No environment",
       "deleteSuccess": "Environment deleted successfully",
@@ -600,7 +600,7 @@
       "createFailed": "Failed to create environment"
     },
     "guide": {
-      "addFirst": "Welcome to Comfyui-Box",
+      "addFirst": "Welcome to Comfy-Nova",
       "selectOne": "Please Select an Environment",
       "pleaseAdd": "Please add a ComfyUI environment to get started",
       "pleaseSelect": "Please select an environment from the title bar to continue",
@@ -644,8 +644,8 @@
       "currentEditorArgs": "Startup parameters from current editor",
       "saveSuccess": "Configuration saved successfully",
       "enterPresetName": "Please enter preset name",
-      "terminalTitle": "geek_mode.sh — Comfyui-Box",
-      "terminalPlaceholder": "# Enter startup parameters here, one per line\n# Example:\n--lowvram\n--use-pytorch-cross-attention",
+      "terminalTitle": "launch_args.conf — Comfy-Nova",
+      "terminalPlaceholder": "# Enter startup arguments here...",
       "presetSaveSuccess": "Geek preset saved successfully",
       "createInProgress": "A preset is being created, please save or cancel first",
       "enterValidName": "Please enter a valid preset name",
@@ -682,9 +682,7 @@
       "argPerLine": "One argument per line, starting with --",
       "supportComment": "Supports blank lines and comments starting with #",
       "argExample": "Example: --port 8188",
-      "argTip": "💡 Tip: Blank lines and comments don't affect preset matching, you can freely add comments to organize parameters",
-      "terminalTitle": "launch_args.conf — Comfyui-Box",
-      "terminalPlaceholder": "# Enter startup arguments here..."
+      "argTip": "💡 Tip: Blank lines and comments don't affect preset matching, you can freely add comments to organize parameters"
     },
     "configSaveFailed": "Failed to save configuration",
     "geekPresetDesc": "Geek mode allows you to customize ComfyUI startup arguments, suitable for advanced users to fine-tune configurations.",
@@ -1365,17 +1363,17 @@
       "prodSuggestion": "Production Suggestion"
     },
     "coreVersion": "Core Version",
-      "updated": "Updated",
-      "python": "Python",
-      "pytorch": "PyTorch",
-      "deleteEnvTitle": "Delete Environment",
-      "deleteEnvConfirm": "Are you sure you want to delete environment \"{alias}\"?",
-      "deleteEnvWarning": "This operation will delete the environment configuration file, but will not delete the ComfyUI folder.",
-      "dev": "DEV",
-      "unknown": "Unknown",
-      "desktopVersion": "Desktop",
-      "cudaVisibleDevicesExample": "CUDA_VISIBLE_DEVICES=0",
-      "terminalTitle": "system_env.sh — Comfyui-Box",
+    "updated": "Updated",
+    "python": "Python",
+    "pytorch": "PyTorch",
+    "deleteEnvTitle": "Delete Environment",
+    "deleteEnvConfirm": "Are you sure you want to delete environment \"{alias}\"?",
+    "deleteEnvWarning": "This operation will delete the environment configuration file, but will not delete the ComfyUI folder.",
+    "dev": "DEV",
+    "unknown": "Unknown",
+    "desktopVersion": "Desktop",
+    "cudaVisibleDevicesExample": "CUDA_VISIBLE_DEVICES=0",
+    "terminalTitle": "system_env.sh — Comfy-Nova",
     "geek": {
       "paramFormat": "Parameter Format",
       "paramError": "Parameter Format Error",
@@ -1405,8 +1403,7 @@
     "modelPathsAutoFilled": "Auto-filled ComfyUI standard paths",
     "saveToEnvAndPreset": "Save current config to env and user preset file",
     "saveAsNewPreset": "Save current config as new preset",
-    "unsavedChanges": "You have unsaved changes, save them?",
-    "saveBeforeSwitch": "You have unsaved changes, save before switching env?"
+    "unsavedChanges": "You have unsaved changes, save them?"
   },
   "process": {
     "title": "Process Management",
@@ -2567,7 +2564,7 @@
       "tokenPlaceholder": "ghp_xxxx or github_pat_xxxx",
       "howToGetTitle": "How to get GitHub Personal Access Token:",
       "step1": "Click the button below to go to GitHub Token creation page",
-      "step2": "Fill in Token description (e.g.: Comfyui-Box)",
+      "step2": "Fill in Token description (e.g.: Comfy-Nova)",
       "step3": "Select permissions: repo and read:user are sufficient",
       "step4": "Click \"Generate token\" to generate and copy the Token",
       "openTokenPage": "Open GitHub Token Creation Page",
@@ -2810,7 +2807,7 @@
     },
     "enableGithubToken": "Enable GitHub API Token",
     "clickToCreateToken": "Click button below to create GitHub Token",
-    "fillTokenDesc": "Fill Token description (e.g., Comfyui-Box)",
+    "fillTokenDesc": "Fill Token description (e.g., Comfy-Nova)",
     "selectPermissions": "Select permissions: repo and read:user",
     "mirror": {
       "title": "GitHub Mirror Acceleration",
@@ -3102,12 +3099,12 @@
     "subtitle": "Redefine your ComfyUI experience",
     "checkUpdate": "Check for Updates",
     "latest": "Latest",
-    "viewFullLog": "View Full Changelog",
+    "viewFullLog": "View full changelog",
     "projectIntro": {
       "title": "About Project",
       "slogan": "Connect creativity, simplify complexity.",
-      "description1": "Comfyui-Box is a next-generation launcher and management terminal designed specifically for ComfyUI. We deeply integrate modern web technologies to provide creators with an ultimate responsive experience, isolated underlying environments, and seamless dependency detection throughout the entire lifecycle.",
-      "description2": "Here, you only need to focus on the creative flow of nodes and workflows, while Comfyui-Box silently handles the complex underlying configurations and update maintenance."
+      "description1": "Comfy-Nova is a next-generation launcher and management terminal designed specifically for ComfyUI. We deeply integrate modern web technologies to provide creators with an ultimate responsive experience, isolated underlying environments, and seamless dependency detection throughout the entire lifecycle.",
+      "description2": "Here, you only need to focus on the creative flow of nodes and workflows, while Comfy-Nova silently handles the complex underlying configurations and update maintenance."
     },
     "techStack": {
       "title": "Core Tech Stack"
@@ -3123,9 +3120,9 @@
     },
     "disclaimer": {
       "title": "Disclaimer",
-      "content": "Comfyui-Box is an open-source/free auxiliary management tool that only provides runtime environment encapsulation and process management. This software does not contain or distribute any copyrighted AI models, weight files, or illegal content. When using this tool to download or run third-party plugins or models, please comply with relevant open-source licenses and local laws and regulations. The team assumes no direct or joint liability for data loss or environment damage caused by the use of this tool or third-party plugins."
+      "content": "Comfy-Nova is an open-source/free auxiliary management tool that only provides runtime environment encapsulation and process management. This software does not contain or distribute any copyrighted AI models, weight files, or illegal content. When using this tool to download or run third-party plugins or models, please comply with relevant open-source licenses and local laws and regulations. The team assumes no direct or joint liability for data loss or environment damage caused by the use of this tool or third-party plugins."
     },
-    "copyright": "© 2026 Comfyui-Box Team. All rights reserved.",
+    "copyright": "© 2026 Comfy-Nova Team. All rights reserved.",
     "poweredBy": "Powered by Open Source Community.",
     "updateToast": "Update check feature coming soon, stay tuned",
     "sponsor": {
@@ -3463,7 +3460,7 @@
     "diskFull": "Disk space insufficient, please clean up and try again",
     "dialogUnavailable": "File dialog unavailable, please use browser default download",
     "saveFailedDetail": "Save failed, please check logs for details",
-    "welcome": "Welcome to Comfyui-Box",
+    "welcome": "Welcome to Comfy-Nova",
     "currentEnv": "Current Environment",
     "coreVersion": "Core Version",
     "desktopVersion": "Desktop",
@@ -3802,7 +3799,7 @@
     "title": "Preset Management",
     "vramFormatHint": "e.g., 8GB, 12GB, 24GB",
     "exportPreset": "Export Preset",
-    "selectToExport": "Select preset to export",
+    "selectToExport": "Select config to export",
     "selectedCount": "{count} selected",
     "dataFormatError": "Preset data format error",
     "loadFailed": "Failed to load preset list",
@@ -3835,14 +3832,12 @@
     "presetName": "Preset Name",
     "presetDesc": "Preset Description",
     "preview": "Preset Preview",
-    "selectToExport": "Select config to export",
     "addNew": "Add New Preset",
     "creating": "Creating...",
     "selectSaveMethod": "Select save method",
     "saveConfig": "Save Config",
     "saveAsNew": "Save as New Preset",
     "vramRequirement": "VRAM Requirement",
-    "vramFormatHint": "e.g., 8GB, 12GB, 24GB",
     "clickToCreate": "Click to create a new preset",
     "none": "None",
     "alreadyExists": "already exists. Overwrite?",
@@ -4090,7 +4085,11 @@
         "detail": "details panel",
         "show": "Show",
         "hide": "Hide"
-      }
+      },
+      "zoomIn": "Zoom in (+)",
+      "zoomOut": "Zoom out (-)",
+      "resetZoom": "Fit to window (0)",
+      "zoomHint": "Scroll to zoom, drag to pan, double-click to toggle fit/2x"
     },
     "showFoldersHint": "On: sub-folders appear as folder cards you click to enter, and the list shows only the assets directly in the current folder. Off: flatten and show every asset in the selected folder and all of its sub-folders.",
     "folder": {

@@ -5,7 +5,7 @@
  * 底部轨道展示筛选后的全部资产，点击即切换。左右方向键翻页，Esc 退出。
  */
 
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Grid, useGridRef, type CellComponentProps } from 'react-window'
 import {
@@ -21,14 +21,19 @@ import {
   PanelRightOpen,
   PanelTopClose,
   PanelTopOpen,
+  RotateCcw,
   Star,
-  X
+  X,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAssetStore } from '@/stores/useAssetStore'
 import { useChromeStore, type ChromeRegion } from '@/stores/useChromeStore'
 import { useElementSize } from '@/hooks/useElementSize'
+import { useImageZoomPan } from '@/hooks/useImageZoomPan'
+import { useIdleVisibility } from '@/hooks/useIdleVisibility'
 import { AssetInfoPanel } from './AssetInfoPanel'
 import type { AssetInfoPanelProps } from './AssetInfoPanel'
 import type { LucideIcon } from 'lucide-react'
@@ -51,11 +56,13 @@ interface StripCellData {
   assets: Asset[]
   activeId: string
   onNavigate: (asset: Asset) => void
+  /** 拖动结束时为真：本次 click 不应切换资产 */
+  shouldSuppressClick: () => boolean
 }
 
-const STRIP_WIDTH = 108
-const STRIP_HEIGHT = 78
-const STRIP_GAP = 8
+const STRIP_WIDTH = 96
+const STRIP_HEIGHT = 68
+const STRIP_GAP = 6
 
 const CHROME_REGIONS: ChromeRegion[] = ['nav', 'filter', 'detail']
 
@@ -94,8 +101,47 @@ export function AssetTheaterView({
   )
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex >= 0 && currentIndex < assets.length - 1
-  const [stripRef, stripSize] = useElementSize<HTMLDivElement>()
+  const [stripSizeRef, stripSize] = useElementSize<HTMLDivElement>()
+  // useElementSize 返回的是回调 ref，读不到 .current；
+  // 另存一份真 ref 用于挂滚轮/拖动监听。
+  const stripContainerRef = useRef<HTMLDivElement | null>(null)
+  const stripRef = useCallback((node: HTMLDivElement | null) => {
+    stripContainerRef.current = node
+    stripSizeRef(node)
+  }, [stripSizeRef])
   const gridRef = useGridRef(null)
+  // 原图是否已加载完成：切换资产时必须复位，否则会沿用上一张的 true 导致
+  // 新图直接以"已加载"外观出现，实际还在下载。
+  const [isFullLoaded, setIsFullLoaded] = useState(false)
+  const [scaleLabel, setScaleLabel] = useState(1)
+
+  const {
+    transform,
+    canPan,
+    isPanning,
+    reset: resetZoom,
+    zoomTo,
+    handleWheel,
+    handlePointerDown,
+    handlePointerMove,
+    endPan,
+    handleDoubleClick
+  } = useImageZoomPan({ onScaleChange: setScaleLabel })
+
+  // 鼠标静止 2.5 秒后收起工具条，让画面尽量干净；移动/按键立刻恢复。
+  const { isVisible: controlsVisible, wake: wakeControls } = useIdleVisibility({ idleDelay: 2500 })
+
+  useEffect(() => {
+    setIsFullLoaded(false)
+    // 切换资产时必须回到适应窗口，否则会沿用上一张的缩放与位移，
+    // 看起来像"新图被放大到了奇怪的位置"。
+    resetZoom()
+  }, [asset.id, resetZoom])
+
+  // 正在拖动画面时保持工具条可见：拖到画面边缘时用户仍需要看到控件
+  useEffect(() => {
+    if (isPanning) wakeControls()
+  }, [isPanning, wakeControls])
 
   const goPrev = useCallback(() => {
     if (hasPrev) onNavigate(assets[currentIndex - 1])
@@ -107,14 +153,43 @@ export function AssetTheaterView({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowLeft') goPrev()
-      if (event.key === 'ArrowRight') goNext()
-      if (event.key === 'Escape') onClose()
+      // 输入框里不拦截，否则在备注/标签里打字会误触发翻页
+      const target = event.target as HTMLElement | null
+      if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return
+      if (target?.isContentEditable) return
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          goPrev()
+          break
+        case 'ArrowRight':
+          goNext()
+          break
+        case 'Escape':
+          onClose()
+          break
+        case '+':
+        case '=':
+          event.preventDefault()
+          zoomTo(transform.scale * 1.25)
+          break
+        case '-':
+        case '_':
+          event.preventDefault()
+          zoomTo(transform.scale / 1.25)
+          break
+        case '0':
+          event.preventDefault()
+          resetZoom()
+          break
+        default:
+          break
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [goPrev, goNext, onClose])
+  }, [goPrev, goNext, onClose, zoomTo, resetZoom, transform.scale])
 
   // 轨道跟随当前资产滚动
   useEffect(() => {
@@ -125,6 +200,98 @@ export function AssetTheaterView({
       columnAlign: 'center'
     })
   }, [currentIndex, gridRef])
+
+  // 胶片条的滚轮横向滚动与拖动
+  //
+  // react-window 的 Grid 自己只处理纵向滚动，而这里是一行横向列表：
+  // 滚轮的 deltaY 需要转成横向位移，拖动也没有现成实现。
+  // 做法是直接改 Grid 滚动容器的 scrollLeft —— 它是普通 DOM，
+  // 比驱动 Grid 的滚动 API 更直接，也不会打断虚拟化。
+  const stripScrollRef = useRef<HTMLElement | null>(null)
+  const stripDragState = useRef<{ startX: number; startScrollLeft: number; moved: boolean } | null>(null)
+  // 拖动结束时置位，让紧随其后的 click 不触发切换
+  const suppressStripClickRef = useRef(false)
+  const [isStripDragging, setIsStripDragging] = useState(false)
+
+  useEffect(() => {
+    const container = stripContainerRef.current
+    if (!container) return
+
+    // Grid 的滚动容器是带 overflow 的那个子节点，取第一个可横向滚动的后代
+    const findScroller = (): Element | null => {
+      const nodes = container.querySelectorAll<HTMLElement>('*')
+      for (const node of nodes) {
+        if (node.scrollWidth > node.clientWidth + 1) return node
+      }
+      return nodes.length ? nodes[nodes.length - 1] : null
+    }
+    stripScrollRef.current = findScroller() as HTMLElement | null
+
+    const onWheel = (event: WheelEvent) => {
+      const scroller = stripScrollRef.current ?? (findScroller() as HTMLElement | null)
+      if (!scroller) return
+      // 竖向滚轮转横向；已经是横向手势（触控板）就直接用 deltaX
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+      if (!delta) return
+      event.preventDefault()
+      scroller.scrollLeft += delta
+    }
+
+    container.addEventListener('wheel', onWheel, { passive: false })
+    return () => container.removeEventListener('wheel', onWheel)
+  }, [assets.length])
+
+  const handleStripPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    const scroller = stripScrollRef.current
+    if (!scroller) return
+    stripDragState.current = {
+      startX: event.clientX,
+      startScrollLeft: scroller.scrollLeft,
+      moved: false
+    }
+    setIsStripDragging(true)
+  }, [])
+
+  const handleStripPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const state = stripDragState.current
+    const scroller = stripScrollRef.current
+    if (!state || !scroller) return
+    const dx = event.clientX - state.startX
+    // 超过阈值才算拖动，否则视为点击（否则轻点和拖动会互相吞掉）
+    if (Math.abs(dx) > 3) state.moved = true
+    if (state.moved) scroller.scrollLeft = state.startScrollLeft - dx
+  }, [])
+
+  const handleStripPointerUp = useCallback(() => {
+    const state = stripDragState.current
+    stripDragState.current = null
+    setIsStripDragging(false)
+    // 拖动结束后标记一下，避免这一下点击被当成"切换资产"
+    if (state?.moved) {
+      suppressStripClickRef.current = true
+      window.setTimeout(() => { suppressStripClickRef.current = false }, 0)
+    }
+  }, [])
+
+  // 预取前后各一张的原图。左右切换时绝大多数情况下都能命中浏览器缓存，
+  // 从而把"切换后等解码"挪到"切换时已经解好"。
+  // 只预取相邻各一张：再多会同时把多张 4K 图压进内存，反而更吃资源。
+  useEffect(() => {
+    if (currentIndex < 0) return
+    const neighbours = [assets[currentIndex - 1], assets[currentIndex + 1]]
+    const images = neighbours
+      .filter((item): item is typeof asset => !!item && item.type !== 'video' && !!item.url)
+      .map((item) => {
+        const img = new Image()
+        img.src = item.url as string
+        return img
+      })
+    return () => {
+      // 主动断开引用，帮助浏览器尽早回收预取图
+      for (const img of images) img.src = ''
+    }
+  }, [assets, currentIndex])
 
   const handleCopy = useCallback(async (text: string) => {
     try {
@@ -178,7 +345,8 @@ export function AssetTheaterView({
   const stripCellData: StripCellData = useMemo(() => ({
     assets,
     activeId: asset.id,
-    onNavigate
+    onNavigate,
+    shouldSuppressClick: () => suppressStripClickRef.current
   }), [assets, asset.id, onNavigate])
 
   const StripCell = useCallback(({ columnIndex, style }: CellComponentProps<StripCellData>) => {
@@ -189,7 +357,10 @@ export function AssetTheaterView({
       <div style={{ ...style, padding: STRIP_GAP / 2 }}>
         <Button
           variant="ghost"
-          onClick={() => stripCellData.onNavigate(item)}
+          onClick={() => {
+            if (stripCellData.shouldSuppressClick()) return
+            stripCellData.onNavigate(item)
+          }}
           title={item.filename}
           className={cn(
             'size-full overflow-hidden rounded-md border-2 bg-surface-active p-0',
@@ -202,6 +373,7 @@ export function AssetTheaterView({
             src={item.thumbnail}
             alt={item.filename}
             loading="lazy"
+            decoding="async"
             className="size-full object-cover"
           />
         </Button>
@@ -212,22 +384,77 @@ export function AssetTheaterView({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-theater">
       <div className="flex min-h-0 flex-1">
-        <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-theater p-6">
+        <div className="group/stage relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-theater">
           {asset.type === 'video' ? (
             <video
               key={asset.id}
               src={asset.url}
               controls
+              preload="metadata"
               className="max-h-full max-w-full rounded-lg"
             >
               {t('asset.detail.videoNotSupported')}
             </video>
           ) : (
-            <img
-              src={asset.url}
-              alt={asset.filename}
-              className="max-h-full max-w-full rounded-lg object-contain"
-            />
+            /*
+             * 舞台：滚轮缩放、按住拖动平移、双击在适应窗口与 2 倍之间切换。
+             *
+             * 图片分两层渲染：缩略图先铺底（几十 KB，网格里已缓存），原图加载
+             * 完成再淡入覆盖，避免每次切换都盯着空白等一张 4K 图解码。
+             * 缩放/位移作用在同一个 wrapper 上，两层始终对齐。
+             */
+            <div
+              className={cn(
+                // absolute inset-0 而不是 h-full/w-full：父级有 p-6，
+                // 用 h-full 会被内边距顶出可视区，导致滚轮锚点整体偏移。
+                'absolute inset-0 flex items-center justify-center overflow-hidden',
+                canPan ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
+              )}
+              onWheel={handleWheel}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={endPan}
+              onPointerCancel={endPan}
+              onDoubleClick={handleDoubleClick}
+            >
+              {/*
+                变换层用 inline-block，尺寸由缩略图撑开（原图 absolute 叠在上面）。
+                这样 transform 的原点落在图片自身中心，拖动的视觉位移与鼠标位移
+                一致；若用撑满父级的 block，原点会偏离图片中心，拖动会"发飘"。
+              */}
+              <div
+                className="relative inline-block will-change-transform"
+                style={{
+                  transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+                  // 拖动时禁用过渡，否则画面会明显滞后于鼠标
+                  transition: isPanning ? 'none' : 'transform 80ms ease-out'
+                }}
+              >
+                <img
+                  key={`${asset.id}-thumb`}
+                  src={asset.thumbnail}
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                  className={cn(
+                    'block max-h-[85vh] max-w-[85vw] select-none rounded-lg object-contain transition-opacity duration-150',
+                    isFullLoaded ? 'opacity-0' : 'opacity-100'
+                  )}
+                />
+                <img
+                  key={`${asset.id}-full`}
+                  src={asset.url}
+                  alt={asset.filename}
+                  draggable={false}
+                  decoding="async"
+                  onLoad={() => setIsFullLoaded(true)}
+                  className={cn(
+                    'absolute inset-0 size-full select-none rounded-lg object-contain transition-opacity duration-150',
+                    isFullLoaded ? 'opacity-100' : 'opacity-0'
+                  )}
+                />
+              </div>
+            </div>
           )}
 
           {hasPrev && (
@@ -236,7 +463,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={goPrev}
               title={t('common.previous')}
-              className="absolute left-4 top-1/2 size-10 -translate-y-1/2 rounded-full bg-surface/80 backdrop-blur-sm"
+              className="absolute left-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/90 group-hover/stage:opacity-100"
             >
               <ChevronLeft className="size-5" />
             </Button>
@@ -248,62 +475,111 @@ export function AssetTheaterView({
               size="icon"
               onClick={goNext}
               title={t('common.next')}
-              className="absolute right-4 top-1/2 size-10 -translate-y-1/2 rounded-full bg-surface/80 backdrop-blur-sm"
+              className="absolute right-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/90 group-hover/stage:opacity-100"
             >
               <ChevronRight className="size-5" />
             </Button>
           )}
 
-          <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border-subtle bg-surface/80 px-3 py-1 text-xs text-muted-foreground backdrop-blur-sm">
+          {/* 单条悬浮工具条：页码 / 收藏 / 缩放 / 布局 / 退出全部收进来，
+              避免四角各飘一块遮挡画面。鼠标静止后淡出，移动即恢复。 */}
+          <div
+            className={cn(
+              'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-full',
+              'border border-border-subtle bg-surface/85 px-1.5 py-1 text-xs shadow-soft-lg',
+              'backdrop-blur-md transition-opacity duration-300',
+              controlsVisible ? 'opacity-100' : 'opacity-0',
+              // 淡出时不接收点击，避免看不见还能点到
+              !controlsVisible && 'pointer-events-none'
+            )}
+          >
             <Button
               variant="ghost"
               size="icon"
               onClick={() => void toggleFavorite(asset.id)}
               title={t('asset.batchFavorite')}
-              className={cn('size-6', asset.isFavorite && 'text-warning')}
+              className={cn('size-7 rounded-full', asset.isFavorite && 'text-warning')}
             >
               <Star className={cn('size-3.5', asset.isFavorite && 'fill-current')} />
             </Button>
-            <span className="font-mono">
-              {t('asset.theater.position', {
-                current: currentIndex + 1,
-                total: assets.length
-              })}
-            </span>
-          </div>
 
-          <div className="absolute right-4 top-4 flex items-center gap-2">
-            <div className="flex items-center gap-0.5 rounded-full border border-border-subtle bg-surface/80 p-1 backdrop-blur-sm">
-              {CHROME_REGIONS.map((region) => {
-                const isHidden = chromeHidden[region]
-                const Icon = isHidden ? CHROME_ICONS[region].show : CHROME_ICONS[region].hide
-                return (
-                  <Button
-                    key={region}
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => toggleChrome(region)}
-                    title={`${t(isHidden ? 'asset.theater.chrome.show' : 'asset.theater.chrome.hide')} ${t(`asset.theater.chrome.${region}`)}`}
-                    className={cn(
-                      'size-7 rounded-full',
-                      isHidden ? 'text-muted-foreground' : 'text-foreground'
-                    )}
-                  >
-                    <Icon className="size-4" />
-                  </Button>
-                )
-              })}
-            </div>
+            <span className="min-w-[64px] px-1 text-center font-mono tabular-nums text-muted-foreground">
+              {currentIndex + 1} / {assets.length}
+            </span>
+
+            {asset.type !== 'video' && (
+              <>
+                <div className="mx-1 h-4 w-px bg-border-subtle" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => zoomTo(transform.scale / 1.25)}
+                  title={t('asset.theater.zoomOut')}
+                  className="size-7 rounded-full"
+                >
+                  <ZoomOut className="size-3.5" />
+                </Button>
+                <button
+                  type="button"
+                  onClick={resetZoom}
+                  title={t('asset.theater.resetZoom')}
+                  className="min-w-[46px] rounded px-1 font-mono tabular-nums text-muted-foreground hover:text-foreground"
+                >
+                  {Math.round(scaleLabel * 100)}%
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => zoomTo(transform.scale * 1.25)}
+                  title={t('asset.theater.zoomIn')}
+                  className="size-7 rounded-full"
+                >
+                  <ZoomIn className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={resetZoom}
+                  title={t('asset.theater.resetZoom')}
+                  className="size-7 rounded-full"
+                >
+                  <RotateCcw className="size-3.5" />
+                </Button>
+              </>
+            )}
+
+            <div className="mx-1 h-4 w-px bg-border-subtle" />
+
+            {CHROME_REGIONS.map((region) => {
+              const isHidden = chromeHidden[region]
+              const Icon = isHidden ? CHROME_ICONS[region].show : CHROME_ICONS[region].hide
+              return (
+                <Button
+                  key={region}
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleChrome(region)}
+                  title={`${t(isHidden ? "asset.theater.chrome.show" : "asset.theater.chrome.hide")} ${t(`asset.theater.chrome.${region}`)}`}
+                  className={cn(
+                    'size-7 rounded-full',
+                    isHidden ? 'text-muted-foreground' : 'text-foreground'
+                  )}
+                >
+                  <Icon className="size-3.5" />
+                </Button>
+              )
+            })}
+
+            <div className="mx-1 h-4 w-px bg-border-subtle" />
 
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
+              size="icon"
               onClick={onClose}
               title={t('asset.theater.exitHint')}
-              className="gap-1.5 rounded-full bg-surface/80 backdrop-blur-sm"
+              className="size-7 rounded-full"
             >
-              <X className="size-4" />
-              {t('asset.theater.exit')}
+              <X className="size-3.5" />
             </Button>
           </div>
         </div>
@@ -397,7 +673,18 @@ export function AssetTheaterView({
         )}
       </div>
 
-      <div ref={stripRef} className="h-[86px] shrink-0 border-t border-border-subtle bg-surface">
+      <div
+        ref={stripRef}
+        className={cn(
+          // 从 86px 收到 76px：只是省一点垂直空间，缩略图仍清晰可辨
+          'h-[76px] shrink-0 border-t border-border-subtle bg-surface',
+          isStripDragging ? 'cursor-grabbing' : 'cursor-grab'
+        )}
+        onPointerDown={handleStripPointerDown}
+        onPointerMove={handleStripPointerMove}
+        onPointerUp={handleStripPointerUp}
+        onPointerCancel={handleStripPointerUp}
+      >
         {stripSize.width > 0 && (
           <Grid
             gridRef={gridRef}

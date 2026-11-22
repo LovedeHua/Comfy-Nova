@@ -242,13 +242,21 @@ backend/test_plugin_logger.py
 test_cache/
 .pytest_cache/
 
-# Temporary test files
-test_*.py
-!backend/tests/test_*.py
+# Temporary test files（只忽略仓库根下的临时脚本）
+#
+# 原规则写成裸 `test_*.py`，会匹配任意目录，把业务模块
+# backend/src/utils/test_isolation.py 一起忽略掉——该文件因此从未入库，
+# 而代码里有 19 处 import 它，任何走到这些路径的操作都会
+# ModuleNotFoundError（例如"切换 ComfyUI 版本"）。
+# 锚定到根目录，避免再次误伤源码。
+/test_*.py
+!/backend/tests/test_*.py
 # 例外必须覆盖嵌套目录，否则 tests/unit/**、tests/integration/** 下的测试文件会被静默忽略
-!backend/tests/**/test_*.py
-!frontend/src/**/*.test.ts
-!frontend/src/**/*.test.tsx
+!/backend/tests/**/test_*.py
+!/frontend/src/**/*.test.ts
+!/frontend/src/**/*.test.tsx
+# 业务模块名恰好以 test_ 开头，显式放行
+!/backend/src/**/test_*.py
 
 # ============================================
 # Git

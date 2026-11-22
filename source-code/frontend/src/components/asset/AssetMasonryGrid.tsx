@@ -60,6 +60,19 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
       }
     }, [])
 
+    // 每张卡的 ref 回调必须按 id 缓存：若在渲染期写 `(el) => registerCardRef(asset.id, el)`，
+    // 每次渲染都是新函数，memo 会因此失效，前面的稳定 props 白做。
+    const cardRefCallbacks = useRef(new Map<string, (el: HTMLDivElement | null) => void>())
+    const getCardRef = useCallback((id: string) => {
+      const cache = cardRefCallbacks.current
+      let cb = cache.get(id)
+      if (!cb) {
+        cb = (el: HTMLDivElement | null) => registerCardRef(id, el)
+        cache.set(id, cb)
+      }
+      return cb
+    }, [registerCardRef])
+
     useEffect(() => {
       const updateColumnCount = () => {
         if (containerRef.current) {
@@ -185,11 +198,13 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
                   >
                     <AssetCard
                       asset={asset}
-                      ref={(el) => registerCardRef(asset.id, el)}
-                      onClick={() => onImageClick?.(asset)}
-                      onDoubleClick={() => onImageDoubleClick?.(asset)}
-                      onView={() => onView?.(asset)}
-                      onContextMenu={(e) => onImageContextMenu?.(e, asset)}
+                      ref={getCardRef(asset.id)}
+                      // 传稳定引用：父级只把「处理哪个资产」的职责交给卡片自己，
+                      // 渲染期不再新建箭头函数（包括 ref），否则 memo 会被逐个击穿。
+                      onImageClick={onImageClick}
+                      onImageDoubleClick={onImageDoubleClick}
+                      onView={onView}
+                      onImageContextMenu={onImageContextMenu}
                       isBatchMode={isBatchMode}
                     />
                   </div>

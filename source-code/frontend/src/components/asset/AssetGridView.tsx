@@ -145,10 +145,12 @@ export const AssetGridView = forwardRef<AssetMasonryGridRef, AssetGridViewProps>
               asset={asset}
               ref={(el) => cellData.registerCardRef(asset.id, el)}
               isBatchMode={cellData.isBatchMode}
-              onClick={() => cellData.onImageClick?.(asset)}
-              onDoubleClick={() => cellData.onImageDoubleClick?.(asset)}
-              onView={() => cellData.onView?.(asset)}
-              onContextMenu={(e) => cellData.onImageContextMenu?.(e, asset)}
+              // 与瀑布流一致：传稳定回调，asset 由卡片内部绑定，
+              // 这样虚拟滚动复用单元格时不必因 handler 引用变化而重渲染。
+              onImageClick={cellData.onImageClick}
+              onImageDoubleClick={cellData.onImageDoubleClick}
+              onView={cellData.onView}
+              onImageContextMenu={cellData.onImageContextMenu}
             />
           </div>
         </div>

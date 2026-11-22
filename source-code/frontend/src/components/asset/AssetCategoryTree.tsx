@@ -17,7 +17,6 @@ import {
   FolderOpen,
   FolderPlus,
   CornerUpLeft,
-  MoreVertical,
   Pencil,
   Plus,
   Trash2,
@@ -418,25 +417,6 @@ export function AssetCategoryTree({
             <span className="shrink-0 rounded bg-primary/20 px-1.5 py-0.5 font-mono text-[11px]">
               {assetCount}
             </span>
-          )}
-          {!isRenaming && (
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label={t('asset.category.actions')}
-              className={cn(
-                'h-6 w-6 shrink-0 rounded p-0 text-muted-foreground',
-                'opacity-0 hover:bg-surface-hover hover:text-foreground focus-visible:opacity-100',
-                'group-hover:opacity-100'
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                const rect = e.currentTarget.getBoundingClientRect()
-                setMenu({ x: rect.right, y: rect.bottom + 4, category })
-              }}
-            >
-              <MoreVertical className="size-3.5" />
-            </Button>
           )}
         </div>
 

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Comfyui-Box",
+    "name": "Comfy-Nova",
     "title": "ComfyUI 管理平台"
   },
   "common": {
@@ -264,7 +264,7 @@
       "selectRestoreMode": "选择恢复模式",
       "versionSwitch": "版本切换",
       "searchSettings": "搜索设置",
-        "saveGeekPreset": "保存极客模式预设",
+      "saveGeekPreset": "保存极客模式预设",
       "confirmOverwrite": "确认覆盖",
       "saveChanges": "保存修改",
       "aiAnalyzeLog": "AI 分析日志",
@@ -285,10 +285,9 @@
       "installStatus": "安装状态",
       "cpuUsage": "CPU 占用",
       "memory": "内存",
-    "vramLabel": "显存",
-    "virtualMemory": "虚拟内存",
-      "gpuTemp": "GPU 温度",
+      "vramLabel": "显存",
       "virtualMemory": "虚拟内存",
+      "gpuTemp": "GPU 温度",
       "gpuUsage": "GPU占用",
       "all": "全部",
       "comfyuiCore": "ComfyUI 核心",
@@ -337,7 +336,6 @@
       "smartMemoryHelp": "智能内存帮助",
       "cacheLruHelp": "缓存 LRU 帮助",
       "fastModeHelp": "快速模式帮助",
-      "cudaMallocHelp": "CUDA 内存分配帮助",
       "cancelVersionSwitch": "取消切换版本",
       "confirmVersionSwitch": "确认切换版本",
       "fileName": "文件: {name}",
@@ -442,7 +440,7 @@
     }
   },
   "home": {
-    "title": "欢迎使用 Comfyui-Box",
+    "title": "欢迎使用 Comfy-Nova",
     "subtitle": "现代化的 ComfyUI 管理工具",
     "systemStatus": "系统状态",
     "currentEnv": "当前环境",
@@ -618,7 +616,7 @@
       "createFailed": "创建环境失败"
     },
     "guide": {
-      "addFirst": "欢迎使用 Comfyui-Box",
+      "addFirst": "欢迎使用 Comfy-Nova",
       "selectOne": "请选择环境",
       "pleaseAdd": "请先添加一个 ComfyUI 环境以开始使用",
       "pleaseSelect": "请从标题栏选择一个环境以继续",
@@ -662,7 +660,7 @@
       "currentEditorArgs": "当前编辑器中的启动参数",
       "saveSuccess": "配置保存成功",
       "enterPresetName": "请输入预设名称",
-      "terminalTitle": "geek_mode.sh — Comfyui-Box",
+      "terminalTitle": "geek_mode.sh — Comfy-Nova",
       "terminalPlaceholder": "# 在此输入启动参数，每行一个\n# 例如：\n--lowvram\n--use-pytorch-cross-attention",
       "presetSaveSuccess": "极客预设保存成功",
       "createInProgress": "已有正在创建的预设，请先保存或取消",
@@ -1471,17 +1469,17 @@
       "prodSuggestion": "生产环境建议"
     },
     "coreVersion": "核心版本",
-      "updated": "更新时间",
-      "python": "Python",
-      "pytorch": "PyTorch",
-      "deleteEnvTitle": "删除环境",
-      "deleteEnvConfirm": "确定要删除环境 \"{alias}\" 吗？",
-      "deleteEnvWarning": "此操作将删除环境配置文件，但不会删除 ComfyUI 文件夹。",
-      "dev": "DEV",
-      "unknown": "未知",
-      "desktopVersion": "桌面版",
-      "cudaVisibleDevicesExample": "CUDA_VISIBLE_DEVICES=0",
-      "terminalTitle": "system_env.sh — Comfyui-Box",
+    "updated": "更新时间",
+    "python": "Python",
+    "pytorch": "PyTorch",
+    "deleteEnvTitle": "删除环境",
+    "deleteEnvConfirm": "确定要删除环境 \"{alias}\" 吗？",
+    "deleteEnvWarning": "此操作将删除环境配置文件，但不会删除 ComfyUI 文件夹。",
+    "dev": "DEV",
+    "unknown": "未知",
+    "desktopVersion": "桌面版",
+    "cudaVisibleDevicesExample": "CUDA_VISIBLE_DEVICES=0",
+    "terminalTitle": "system_env.sh — Comfy-Nova",
     "geek": {
       "paramFormat": "参数格式说明",
       "paramError": "参数格式错误",
@@ -2669,7 +2667,7 @@
       "tokenPlaceholder": "ghp_xxxx 或 github_pat_xxxx",
       "howToGetTitle": "如何获取 GitHub Personal Access Token：",
       "step1": "点击下方按钮跳转到 GitHub Token 创建页面",
-      "step2": "填写 Token 描述（如：Comfyui-Box）",
+      "step2": "填写 Token 描述（如：Comfy-Nova）",
       "step3": "选择权限：repo 和 read:user 即可",
       "step4": "点击 \"Generate token\" 生成并复制 Token",
       "openTokenPage": "打开 GitHub Token 创建页面",
@@ -2912,7 +2910,7 @@
     },
     "enableGithubToken": "启用 GitHub API Token",
     "clickToCreateToken": "点击下方按钮跳转到 GitHub Token 创建页面",
-    "fillTokenDesc": "填写 Token 描述（如：Comfyui-Box）",
+    "fillTokenDesc": "填写 Token 描述（如：Comfy-Nova）",
     "selectPermissions": "选择权限：repo 和 read:user 即可",
     "mirror": {
       "title": "GitHub 镜像加速",
@@ -3204,12 +3202,12 @@
     "subtitle": "重新定义你的 ComfyUI 交互体验",
     "checkUpdate": "检查更新",
     "latest": "最新",
-    "viewFullLog": "查看完整日志",
+    "viewFullLog": "查看完整更新日志",
     "projectIntro": {
       "title": "关于项目",
       "slogan": "联结创意，驭繁就简。",
-      "description1": "Comfyui-Box 是一款专为 ComfyUI 打造的次世代启动与管理终端。我们深度整合了现代 Web 技术，旨在为创作者提供极致响应、底层环境隔离与核心依赖无缝检测的全生命周期管理体验。",
-      "description2": "在这里，你只需专注于节点与工作流的创意流转，复杂的底层配置与更新维护交由 Comfyui-Box 默默守护。"
+      "description1": "Comfy-Nova 是一款专为 ComfyUI 打造的次世代启动与管理终端。我们深度整合了现代 Web 技术，旨在为创作者提供极致响应、底层环境隔离与核心依赖无缝检测的全生命周期管理体验。",
+      "description2": "在这里，你只需专注于节点与工作流的创意流转，复杂的底层配置与更新维护交由 Comfy-Nova 默默守护。"
     },
     "techStack": {
       "title": "核心技术栈"
@@ -3225,9 +3223,9 @@
     },
     "disclaimer": {
       "title": "免责声明 (Disclaimer)",
-      "content": "Comfyui-Box 作为一个开源/免费的辅助管理工具，仅提供运行环境的封装与流程管理。本软件不包含、也不分发任何受版权保护的 AI 模型、权重文件或违法违规内容。用户在使用本工具下载或运行第三方插件、模型时，请自行遵守相关开源协议与当地法律法规。对于因使用本工具或第三方插件导致的数据丢失或环境损坏，本团队不承担直接或连带责任。"
+      "content": "Comfy-Nova 作为一个开源/免费的辅助管理工具，仅提供运行环境的封装与流程管理。本软件不包含、也不分发任何受版权保护的 AI 模型、权重文件或违法违规内容。用户在使用本工具下载或运行第三方插件、模型时，请自行遵守相关开源协议与当地法律法规。对于因使用本工具或第三方插件导致的数据丢失或环境损坏，本团队不承担直接或连带责任。"
     },
-    "copyright": "© 2026 Comfyui-Box Team. All rights reserved.",
+    "copyright": "© 2026 Comfy-Nova Team. All rights reserved.",
     "poweredBy": "Powered by Open Source Community.",
     "updateToast": "检查更新功能即将上线，敬请期待",
     "sponsor": {
@@ -3688,7 +3686,7 @@
     "comfyUIStatusCard": "ComfyUIStatusCard",
     "folderShortcutBar": "FolderShortcutBar",
     "creatorRecommendationGrid": "CreatorRecommendationGrid",
-    "comfyNexus": "Comfyui-Box",
+    "comfyNexus": "Comfy-Nova",
     "addEnv": "添加环境",
     "civitaiApiKeyConfigured": "已在设置中配置 Civitai API Key",
     "civitaiApiKey": "Civitai API Key",
@@ -4011,7 +4009,7 @@
     "diskFull": "磁盘空间不足，请清理磁盘后重试",
     "dialogUnavailable": "文件对话框不可用，请使用浏览器默认下载功能",
     "saveFailedDetail": "保存失败，请查看日志了解详情",
-    "welcome": "欢迎使用 Comfyui-Box",
+    "welcome": "欢迎使用 Comfy-Nova",
     "currentEnv": "当前环境",
     "coreVersion": "核心版本",
     "desktopVersion": "桌面版",
@@ -4355,7 +4353,7 @@
     "vramFormatHint": "例如：8GB、12GB、24GB",
     "import": "导入预设",
     "exportPreset": "导出预设",
-    "selectToExport": "选择要导出的预设",
+    "selectToExport": "选择要导出的配置",
     "selectedCount": "已选择 {count} 个",
     "dataFormatError": "预设数据格式错误",
     "loadFailed": "加载预设列表失败",
@@ -4388,7 +4386,6 @@
     "presetName": "预设名称",
     "presetDesc": "预设描述",
     "preview": "预设预览",
-    "selectToExport": "选择要导出的配置",
     "addNew": "新增预设",
     "creating": "正在创建...",
     "selectSaveMethod": "请选择保存方式",
@@ -4679,7 +4676,11 @@
         "detail": "详情栏",
         "show": "显示",
         "hide": "隐藏"
-      }
+      },
+      "zoomIn": "放大（+）",
+      "zoomOut": "缩小（-）",
+      "resetZoom": "适应窗口（0）",
+      "zoomHint": "滚轮缩放，拖动平移，双击切换适应/2 倍"
     },
     "showFoldersHint": "开启：子目录以文件夹卡片呈现，需点击进入，列表只显示当前目录直属的资产。关闭：平铺展示所选目录及其所有子目录的全部资产。",
     "folder": {

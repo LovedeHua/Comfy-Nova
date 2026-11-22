@@ -5,7 +5,7 @@
  * - 首次打开或版本更新后首次打开自动弹出
  * - 显示最近3个版本的更新日志
  * - 支持 Markdown 格式渲染
- * - 从 GitHub Releases 获取数据
+ * - 数据来自随包分发的 CHANGELOG.md（不再读上游 GitHub Releases）
  */
 
 import { useState, useEffect } from 'react'
@@ -23,7 +23,7 @@ import { MarkdownRenderer } from '@/components/ai/MarkdownRenderer'
 import { fetchReleases, GitHubRelease, formatReleaseDate } from '@/api/githubApi'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react'
-import { GITHUB_RELEASES_URL } from '@/api/githubApi'
+import { GITHUB_REPO_URL } from '@/api/githubApi'
 
 interface ChangelogDialogProps {
   open: boolean
@@ -170,7 +170,7 @@ export function ChangelogDialog({
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
-                            openExternal(release.html_url)
+                            openExternal(GITHUB_REPO_URL)
                           }}
                           className="shrink-0"
                         >
@@ -200,7 +200,7 @@ export function ChangelogDialog({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => openExternal(GITHUB_RELEASES_URL)}
+            onClick={() => openExternal(GITHUB_REPO_URL)}
             className="text-muted-foreground"
           >
             <ExternalLink className="mr-2 size-4" />

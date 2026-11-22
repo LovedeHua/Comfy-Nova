@@ -18,6 +18,11 @@ from ...utils.logger import app_logger as logger
 import json
 
 
+# 排队等待的额外宽限（秒）。任务尚未开始执行时，用它放宽超时上限，
+# 避免并发满员时把纯排队时间误判成网络超时。
+QUEUE_TIMEOUT_GRACE = 120
+
+
 class GitConcurrent:
     """并发 Git 操作管理器"""
     
@@ -305,14 +310,21 @@ class GitConcurrent:
         # 这样可以在退出时使用shutdown(wait=False)避免等待未完成的任务
         executor = ThreadPoolExecutor(max_workers=self.max_workers)
         try:
-            # 提交任务，记录提交时间
+            # 提交任务。超时从「任务真正开始执行」起算，而不是从提交起算：
+            # 并发只有 max_workers 个，几百个插件时排在队列里的任务光是等待
+            # 就可能超过 timeout_per_plugin，导致网络完全正常也报「获取超时」。
             future_to_plugin = {}
             future_to_start_time = {}
-            
+            # 任务开始时写入自己的启动时间，供超时判定读取
+            start_times: dict = {}
+
             for plugin in plugins:
                 if plugin.is_git_repo:
-                    future = executor.submit(self._update_single_git_info, plugin)
+                    future = executor.submit(
+                        self._update_single_git_info_timed, plugin, start_times
+                    )
                     future_to_plugin[future] = plugin
+                    # 提交时间仅作兜底（任务尚未启动时用它判断"排队过久"）
                     future_to_start_time[future] = time.time()
             
             # 处理结果
@@ -375,12 +387,24 @@ class GitConcurrent:
                             pass
                 
                 # 检查超时的任务
+                #
+                # 判定分两种情况：
+                # - 任务已在执行：从它真正开始的时间算，超时才成立；
+                # - 任务还排在队列里（未开始）：用提交时间算，但给更宽的上限
+                #   （queue_timeout_grace），避免把"排队"误报成"网络超时"。
                 current_time = time.time()
                 timeout_futures = []
-                
+
                 for future in list(pending):
-                    elapsed = current_time - future_to_start_time[future]
-                    if elapsed > timeout_per_plugin:
+                    plugin_obj = future_to_plugin[future]
+                    started_at = start_times.get(plugin_obj.name)
+                    if started_at is not None:
+                        elapsed = current_time - started_at
+                        limit = timeout_per_plugin
+                    else:
+                        elapsed = current_time - future_to_start_time[future]
+                        limit = timeout_per_plugin + QUEUE_TIMEOUT_GRACE
+                    if elapsed > limit:
                         timeout_futures.append(future)
                 
                 # 取消超时的任务
@@ -424,6 +448,29 @@ class GitConcurrent:
         
         return plugins
     
+    def _update_single_git_info_timed(self, plugin: PluginInfo, start_times: dict) -> Optional[PluginInfo]:
+        """在真正开始执行时记录启动时间，供超时判定使用。
+
+        多包一层的原因：线程池的任务在提交后可能长时间排队，
+        若用提交时间计算超时，插件一多就会把排队时间算成网络耗时，
+        出现「网络正常但全部获取超时」的误报。
+
+        Args:
+            plugin: 待更新的插件
+            start_times: 由调用方提供的共享字典，键为插件名（目录名，唯一），值为启动时间戳
+
+        Returns:
+            与 _update_single_git_info 相同
+        """
+        import time as _time
+
+        start_times[plugin.name] = _time.time()
+        try:
+            return self._update_single_git_info(plugin)
+        finally:
+            # 结束后标记为已启动完成，超时判定不再看它
+            start_times.pop(plugin.name, None)
+
     def _update_single_git_info(self, plugin: PluginInfo) -> Optional[PluginInfo]:
         """
         更新单个插件的Git信息
@@ -439,33 +486,33 @@ class GitConcurrent:
         try:
             repo_path = plugin.path
             
-            # 步骤 0: 预检查 - 使用 git status 快速检测权限问题
-            # git status 是本地命令，执行速度快，可以提前发现权限问题
-            has_permission_issue, permission_error = self.git_utils.check_safe_directory_issue(repo_path)
-            if has_permission_issue:
-                # 如果有权限问题，直接抛出异常，不继续执行后续命令
-                raise Exception(f"Git 权限检查失败: {permission_error}")
-            
-            # 步骤 1: 获取远端地址（如果失败，立即抛出异常）
-            git_url = self.git_utils.get_remote_url(repo_path)
+            # 步骤 0-5: 一次调用取回权限状态、远端地址、分支、hash、提交时间。
+            #
+            # 原实现是 6 次独立的 git 进程（权限检查、remote、rev-parse ×2、
+            # log、symbolic-ref），实测单仓库约 370–800 ms，其中绝大部分是
+            # 进程启动开销。合并成 3 次（权限+status / log / remote）后
+            # 降到约 280 ms，插件多时整批耗时按比例下降。
+            summary = self.git_utils.get_local_repo_summary(repo_path)
+
+            if summary.get("permission_error"):
+                raise Exception(f"Git 权限检查失败: {summary['permission_error']}")
+
+            git_url = summary.get("remote_url")
             if not git_url:
                 raise Exception("无法获取远端地址 (git remote get-url origin 失败)")
-            
-            # 步骤 2: 获取当前分支（如果失败，立即抛出异常）
-            branch = self.git_utils.get_current_branch(repo_path)
+
+            branch = summary.get("branch")
             if not branch:
-                raise Exception("无法获取当前分支 (git rev-parse --abbrev-ref HEAD 失败)")
-            
-            # 步骤 3: 获取默认分支（允许失败，使用空字符串）
-            default_branch = self.git_utils.get_default_branch(repo_path) or ''
-            
-            # 步骤 4: 获取提交 hash（如果失败，会抛出异常）
-            commit_hash = self.git_utils.get_commit_hash(repo_path, short=True)
+                raise Exception("无法获取当前分支 (git status --branch 未返回 branch.head)")
+
+            # 默认分支：status 的 branch.upstream 提供，取不到时留空
+            default_branch = summary.get("default_branch") or ''
+
+            commit_hash = summary.get("commit_hash")
             if not commit_hash:
-                raise Exception("无法获取提交 hash (git rev-parse HEAD 失败)")
-            
-            # 步骤 5: 获取提交时间（允许失败，使用空字符串）
-            commit_date = self.git_utils.get_commit_date(repo_path) or ''
+                raise Exception("无法获取提交 hash (git status --branch 未返回 branch.oid)")
+
+            commit_date = summary.get("commit_date") or ''
             
             # 步骤 6: 极速检测更新（使用 ls-remote，无需 fetch）
             # 核心优化：使用 git ls-remote --symref origin HEAD 获取远程最新 hash

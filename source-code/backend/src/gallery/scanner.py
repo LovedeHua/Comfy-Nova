@@ -6,6 +6,7 @@
 import os
 import uuid
 import hashlib
+import threading
 import shutil
 from pathlib import Path
 from datetime import datetime
@@ -20,6 +21,12 @@ SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".webm"}
 SUPPORTED_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS | SUPPORTED_VIDEO_EXTENSIONS
 
+# 缩略图最长边。网格卡片常见显示宽度 200–400 px，2x DPI 下 400–800 px 已足够；
+# 取 512 在清晰度与内存之间折中（512×512 RGBA 解码约 1 MB，4K 原图是 30–50 MB）。
+THUMBNAIL_MAX_SIZE = 512
+# webp 质量：80 在缩略图尺度上看不出劣化，体积约为 90 的 60%。
+THUMBNAIL_QUALITY = 80
+
 
 class GalleryScanner:
     """资产库扫描服务"""
@@ -28,6 +35,9 @@ class GalleryScanner:
     _stopping = False
     _scan_progress: Optional[ScanProgress] = None
     _metadata_backfilled = False
+    _thumbnails_backfilled = False
+    _thumbnail_thread: Optional[threading.Thread] = None
+    _thumbnail_lock = threading.Lock()
 
     def __init__(self):
         self._cancelled = False
@@ -229,6 +239,12 @@ class GalleryScanner:
 
         gallery_storage.update_settings(last_scan_time=datetime.now().isoformat())
 
+        # 新增资产还没有缩略图，扫描一结束就交给后台线程补，
+        # 不阻塞本次扫描的返回。
+        if added_count > 0 or updated_count > 0:
+            self._thumbnails_backfilled = False
+            self.start_thumbnail_backfill()
+
         result = {
             "added": added_count,
             "updated": updated_count,
@@ -360,6 +376,12 @@ class GalleryScanner:
 
         gallery_storage.update_settings(last_scan_time=datetime.now().isoformat())
 
+        # 新增资产还没有缩略图，扫描一结束就交给后台线程补，
+        # 不阻塞本次扫描的返回。
+        if added_count > 0 or updated_count > 0:
+            self._thumbnails_backfilled = False
+            self.start_thumbnail_backfill()
+
         result = {
             "added": added_count,
             "updated": updated_count,
@@ -483,6 +505,77 @@ class GalleryScanner:
             logger.info(f"[GalleryScanner] 已补齐 {updated} 个视频资产的提示词与生成参数")
         return updated
 
+    def start_thumbnail_backfill(self) -> bool:
+        """在后台线程补齐图片缩略图，不阻塞扫描与界面。
+
+        缩略图单张约 40 ms，几千张就是几分钟。放在扫描主循环里会让进度条
+        长时间不动；放在这里则扫描一结束就返回，缩略图边生成边可用。
+
+        Returns:
+            是否真正启动了后台任务（已启动过/没有待补任务时返回 False）
+        """
+        with self._thumbnail_lock:
+            if self._thumbnail_thread and self._thumbnail_thread.is_alive():
+                return False
+            if self._thumbnails_backfilled:
+                return False
+            thread = threading.Thread(
+                target=self._run_thumbnail_backfill,
+                name="gallery-thumbnails",
+                daemon=True,
+            )
+            self._thumbnail_thread = thread
+            thread.start()
+            return True
+
+    def _run_thumbnail_backfill(self) -> None:
+        """后台线程体：逐张生成，批量落盘。"""
+        try:
+            self.backfill_image_thumbnails(force=True)
+        except Exception as e:
+            logger.warning(f"[GalleryScanner] 缩略图后台补齐失败: {e}")
+        finally:
+            self._thumbnails_backfilled = True
+
+    def backfill_image_thumbnails(self, force: bool = False) -> int:
+        """为历史图片资产补生成缩略图。
+
+        早期版本只给视频生成缩略图，图片的 thumbnail_path 恒为 None，
+        /gallery/thumbnail/<id> 因此直接回原图，列表里每张卡片都在解码 4K 原图。
+        这是图一多就卡、内存就高的根因。
+
+        逐条补齐并走 batch_updates，进程内只跑一次；文件缺失的跳过。
+
+        Args:
+            force: 忽略进程内一次性标记，强制重跑
+
+        Returns:
+            实际补齐的资产数量
+        """
+        if self._thumbnails_backfilled and not force:
+            return 0
+        self._thumbnails_backfilled = True
+
+        updated = 0
+        with gallery_storage.batch_updates():
+            for asset in gallery_storage.get_assets():
+                if asset.asset_type != "image" or asset.thumbnail_path:
+                    continue
+                file_path = Path(asset.file_path)
+                if not file_path.exists():
+                    continue
+
+                thumbnail_rel = self._generate_image_thumbnail(file_path)
+                if not thumbnail_rel:
+                    continue
+
+                gallery_storage.update_asset(asset.id, thumbnail_path=thumbnail_rel)
+                updated += 1
+
+        if updated:
+            logger.info(f"[GalleryScanner] 已为 {updated} 个图片资产补生成缩略图")
+        return updated
+
     def _needs_update(self, asset: Asset, file_path: Path) -> bool:
         """检查资产是否需要更新"""
         try:
@@ -492,6 +585,51 @@ class GalleryScanner:
             return file_ctime != asset.created_at or file_size != asset.size
         except Exception:
             return False
+
+    def _generate_image_thumbnail(self, file_path: Path) -> Optional[str]:
+        """生成图片缩略图（webp）。
+
+        此前只有视频会生成缩略图，图片资产的 thumbnail_path 恒为 None，
+        导致 /gallery/thumbnail/<id> 直接回原图：网格里每张卡片都在解码
+        一张 4K PNG（内存里约 30–50 MB），几百张就能把内存吃满，滚动必然卡。
+        这里按最长边缩到 THUMBNAIL_MAX_SIZE 并落成 webp，体积通常小两个数量级。
+
+        Args:
+            file_path: 原图路径
+
+        Returns:
+            相对 thumbnails 目录的路径（形如 thumbnails/xxx.webp）；失败返回 None。
+        """
+        try:
+            from PIL import Image
+
+            with Image.open(file_path) as img:
+                if img.mode not in ("RGB", "RGBA"):
+                    img = img.convert("RGB")
+
+                # draft() 对 JPEG 能在解码前按比例降采样，4K JPEG 的解码开销可降一个量级；
+                # PNG 不支持 draft，但下面的 thumbnail() 会限制最终像素量。
+                img.draft("RGB", (THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE))
+                img.thumbnail((THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE), Image.Resampling.LANCZOS)
+
+                thumbnail_filename = (
+                    f"{file_path.stem}_{hashlib.md5(str(file_path).encode()).hexdigest()[:8]}.webp"
+                )
+                thumbnail_path = self._thumbnails_dir / thumbnail_filename
+                self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
+
+                # 带透明通道的图直接转 RGB 会变黑底；先把透明区压到深色背景，
+                # 观感更稳，也避免 webp 保留 alpha 带出额外体积。
+                if img.mode == "RGBA":
+                    background = Image.new("RGB", img.size, (24, 24, 27))
+                    background.paste(img, mask=img.split()[-1])
+                    img = background
+
+                img.save(thumbnail_path, "WEBP", quality=THUMBNAIL_QUALITY, method=4)
+                return f"thumbnails/{thumbnail_filename}"
+        except Exception as e:
+            logger.warning(f"[GalleryScanner] 生成图片缩略图失败 {file_path}: {e}")
+            return None
 
     def _create_asset(self, file_path: Path, category_id: Optional[str] = None) -> Optional[Asset]:
         """创建资产对象"""
@@ -507,6 +645,11 @@ class GalleryScanner:
             thumbnail_path = None
             if asset_type == "video":
                 thumbnail_path = self._generate_video_thumbnail(file_path)
+            else:
+                # 图片缩略图不在扫描主循环里同步生成：单张约 40 ms，几千张就是
+                # 几分钟，会把扫描进度条卡住。这里先留空，由 backfill_image_thumbnails()
+                # 在扫描结束后补齐（缺失期间路由会回原图，只是慢，不会出错）。
+                thumbnail_path = None
 
             asset_id = self._generate_id(file_path)
 

@@ -145,6 +145,8 @@ interface AssetStore {
   setShowFoldersInList: (show: boolean) => void
   setViewMode: (mode: AssetViewMode) => void
   getFilteredAssets: () => Asset[]
+  /** 只要过滤结果数量时用它，省掉调用方拿数组再取 length 的歧义 */
+  getFilteredCount: () => number
   getGalleryItems: () => AssetGalleryItem[]
   getNsfwStatus: () => Promise<{ success: boolean; modelAvailable?: boolean; nsfwAutoClassify?: boolean; nsfwThreshold?: number; nsfwAutoBlur?: boolean; isScanning?: boolean; isPaused?: boolean }>
   setNsfwEnabled: (enabled: boolean) => Promise<boolean>
@@ -1258,6 +1260,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     filterCache.value = filtered
     return filtered
   },
+
+  getFilteredCount: () => get().getFilteredAssets().length,
 
   getGalleryItems: () => {
     const state = get()

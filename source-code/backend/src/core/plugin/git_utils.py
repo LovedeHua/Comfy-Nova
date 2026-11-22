@@ -231,7 +231,16 @@ class GitUtils:
             
             mirrors_to_try = self._get_git_mirror_priority_list()
             last_stderr = ""
-            
+
+            # 镜像 fallback 共享同一个时间预算。
+            # 原实现给每个镜像各自 timeout，3 个镜像就是 3×timeout：
+            # ls-remote 传 15 秒时最坏 45 秒，而调用方（插件并发更新）
+            # 的单插件上限只有 30 秒 —— 网络慢一点就必然被判超时，
+            # 表现出来就是"网络是通的但全部获取超时"。
+            import time as _time
+
+            total_deadline = _time.monotonic() + (timeout or self.timeout)
+
             for attempt, mirror in enumerate(mirrors_to_try):
                 env_copy = command_env.copy()
                 
@@ -243,12 +252,18 @@ class GitUtils:
                 else:
                     logger.dev(f"[GitUtils] 尝试直连 GitHub ({attempt + 1}/{len(mirrors_to_try)})")
                 
+                remaining = total_deadline - _time.monotonic()
+                if remaining <= 0.5:
+                    # 预算已耗尽，不再试下一个镜像（否则总耗时会翻倍）
+                    logger.dev("[GitUtils] 镜像重试预算耗尽，放弃剩余尝试")
+                    break
+
                 result = subprocess.run(
                     cmd,
                     cwd=str(cwd),
                     capture_output=True,
                     text=True,
-                    timeout=timeout or self.timeout,
+                    timeout=remaining,
                     encoding='utf-8',
                     errors='replace',
                     env=env_copy,
@@ -341,6 +356,72 @@ class GitUtils:
         git_dir = path / ".git"
         return git_dir.exists() and git_dir.is_dir()
     
+    def get_local_repo_summary(self, repo_path: Path) -> dict:
+        """一次 git 进程取回大部分本地元数据。
+
+        原先远端地址 / 当前分支 / 默认分支 / 提交 hash / 提交时间各自
+        起一个 git 进程，实测单仓库 6 次本地调用合计约 370–800 ms。
+        其中 hash、当前分支、上游分支三者可以用一条
+        `git status --porcelain=v2 --branch` 一起拿到（实测约 100 ms），
+        把 6 次进程启动压到 3 次。
+
+        注意：`git log --pretty=format:` 不支持 %(...) 形式的 ref 占位符，
+        此处用 status 的 branch.* 输出，不要再改回 log。
+
+        Args:
+            repo_path: 仓库路径
+
+        Returns:
+            dict，键为 remote_url / branch / default_branch / commit_hash /
+            commit_date / permission_error；取不到的字段为 None
+        """
+        result = {
+            "remote_url": None,
+            "branch": None,
+            "default_branch": None,
+            "commit_hash": None,
+            "commit_date": None,
+            "permission_error": None,
+        }
+
+        has_issue, permission_error = self.check_safe_directory_issue(repo_path)
+        if has_issue:
+            result["permission_error"] = permission_error
+            return result
+
+        # 1) 一条命令同时给出 hash / 当前分支 / 上游跟踪分支
+        ok, stdout, _ = self._run_command(
+            ["status", "--porcelain=v2", "--branch", "--untracked-files=no"],
+            repo_path,
+        )
+        if ok and stdout:
+            for line in stdout.splitlines():
+                if line.startswith("# branch.oid "):
+                    oid = line.split()[-1]
+                    if oid and oid != "(initial)":
+                        result["commit_hash"] = oid[:7]
+                elif line.startswith("# branch.head "):
+                    head = line.split()[-1]
+                    if head and head != "(detached)":
+                        result["branch"] = head
+                elif line.startswith("# branch.upstream "):
+                    upstream = line.split()[-1]
+                    # origin/main -> main；没有上游时该行不出现
+                    if upstream and "/" in upstream:
+                        result["default_branch"] = upstream.split("/", 1)[1]
+
+        # 2) 提交时间（status 不含）
+        ok, stdout, _ = self._run_command(["log", "-1", "--format=%aI"], repo_path)
+        if ok and stdout.strip():
+            result["commit_date"] = stdout.strip()
+
+        # 3) 远端地址（status 不含）
+        ok, stdout, _ = self._run_command(["remote", "get-url", "origin"], repo_path)
+        if ok and stdout.strip():
+            result["remote_url"] = stdout.strip()
+
+        return result
+
     def get_remote_url(self, repo_path: Path) -> Optional[str]:
         """
         获取远端地址

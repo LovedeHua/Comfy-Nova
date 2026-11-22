@@ -16,14 +16,16 @@ export function AssetBatchToolbar({ onDeleteConfirm }: AssetBatchToolbarProps) {
   const { t } = useTranslation()
   const {
     selectedAssetIds,
-    getFilteredAssets,
+    getFilteredCount,
     clearSelection,
     toggleBatchMode,
     toggleFavorite
   } = useAssetStore()
 
   const selectedCount = selectedAssetIds.length
-  const filteredCount = getFilteredAssets().length
+  // 文案是「已选 N 个 / 共 M 个」，M 是当前筛选结果总数（不是选中数）。
+  // 只要数量，用 count 接口而不是拿数组再取 length。
+  const filteredCount = getFilteredCount()
 
   if (selectedCount === 0) {
     return null

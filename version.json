@@ -1,8 +1,8 @@
 {
-  "version": "V1.0.3",
-  "published_at": "2026-11-11T04:50:13Z",
-  "download_url": "https://github.com/qiqStrong/Comfyui-Box/releases/download/v1.0.3/Comfyui-Box-v1.0.3-win64.zip",
+  "version": "V1.1.1",
+  "published_at": "2026-11-22T12:33:56Z",
+  "download_url": "https://github.com/qiqStrong/Comfy-Nova/releases/download/v1.0.3/Comfy-Nova-v1.0.3-win64.zip",
   "file_size": 155580159,
   "file_hash": "9c958b79d68079eba8a9ffcddf35e51fb52cbd242696e6e191361953544192ce",
-  "release_notes": "# Comfyui-Box V1.0.3 更新日志\n\n**版本类型**：Stable\n\n## 🐛 问题修复\n\n- **统一节点数口径**：列表卡片统计的是 JSON 里 `nodes` 数组的长度，详情面板却排除了 `Reroute` / `Note` 等虚拟节点，同一份工作流会出现「卡片 7 节点、详情 5 节点」。现在两边统一按**实际节点**计数（排除虚拟节点），并在详情里注明还有几个虚拟节点未计入\n- **API 格式工作流详情显示 0 节点**：这类文件没有 `nodes` 数组，详情统计恒为 0，与卡片的数字对不上。现在按 `class_type` 条目计数，与卡片保持一致，节点图位置改为提示「API 格式无法绘制节点图」\n- 工作流 JSON 的 `nodes` / `links` 不是数组、或数组里混入非对象记录时，解析直接跳过而不是抛异常\n- **更新日志弹窗把旧版本标成「最新」**：仓库里只发了 v1.0.0 的 Release 时，弹窗会显示「当前版本 V1.0.2、日志里 V1.0.0 是最新」。现在会把随包分发的版本说明一并并入列表，按发布时间排序，当前版本始终排在最前\n"
+  "release_notes": "## V1.1.1\n\n> 发布日期：2026-11-22\n\n### 变更\n\n- **品牌更名**：项目更名 Comfy-Nova（fork 自 Comfyui-Box / ComfyNexus），\n  窗口标题、实例锁、托盘、更新器、Bridge 插件目录同步更名\n- **更新日志本地化**：更新日志改为随包分发的 CHANGELOG.md，不再读取上游 Releases\n\n### 新增\n\n- 影院模式：滚轮缩放（锚点跟随）、拖动平移、双击切换适应/2 倍、快捷键 +/-/0\n- 影院模式：胶片条支持滚轮横向滚动与拖动\n- 影院模式：浮层控件合并为单条工具条，鼠标静止自动隐藏\n- 资产库分类树：移除冗余的三竖点按钮（右键菜单保留全部操作）\n\n### 修复\n\n- 影院模式平移：适应窗口下可拖动、缩放原点对齐图片中心、拖动位移与鼠标一致\n- 插件更新：排队不再误报超时，镜像重试共享时间预算，103 插件 57s → 23s\n- 依赖安装失败时输出可读原因（代理/镜像/网络提示）\n- test_isolation 模块缺失导致版本切换/插件安装报 ModuleNotFoundError\n- 高 DPI 下窗口尺寸正确；打包补收 libffi-8.dll 修复启动即崩\n\n---"
 }
