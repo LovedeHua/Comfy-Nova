@@ -227,8 +227,8 @@ ComfyNexus运行环境检测/
 
 # 测试隔离数据副本（从生产用户数据根复制，含密钥/业务元数据，绝不入库）
 /test-data/
-.git-msg-tmp
+
 # PyInstaller/子进程在错误环境变量下生成的垃圾目录
 /%SystemDrive%/
-.git-msg-fix
+.git-msg-*
 .git-msg-tmp
