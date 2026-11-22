@@ -269,11 +269,10 @@ export function AssetTheaterView({
       moved: false,
       pointerId: event.pointerId
     }
-    // 捕获指针：拖动途中滑出容器（甚至窗口）后 move 事件仍会路由回这里，
-    // 松手时必然收到 pointerup。没有这一步，指针离开容器再回来会被误判
-    // 成"仍在拖动"，出现不点击也能拖动的鬼拖。
-    event.currentTarget.setPointerCapture(event.pointerId)
-    setIsStripDragging(true)
+    // 这里故意不 setPointerCapture：一旦捕获，浏览器会把后续 click 的 target
+    // 改成捕获元素，缩略图按钮的 onClick 全部失效（点击切换就死了）。
+    // capture 推迟到 move 里确认是拖动后再执行，纯点击不受影响。
+    // 拖动中的鬼拖由 move 里的 buttons===0 兜底处理。
   }, [])
 
   const handleStripPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -286,6 +285,12 @@ export function AssetTheaterView({
       stripDragState.current = null
       setIsStripDragging(false)
       return
+    }
+    // 确认进入拖动（位移超阈值）才捕获指针：此后滑出容器 move 仍路由到这里，
+    // 松手必收 pointerup。捕获会让 click target 变成本容器，但拖动后本来
+    // 就要抑制 click，正好。
+    if (state.moved && !event.currentTarget.hasPointerCapture(state.pointerId)) {
+      try { event.currentTarget.setPointerCapture(state.pointerId) } catch { /* 元素已卸载 */ }
     }
     const dx = event.clientX - state.startX
     // 超过阈值才算拖动，否则视为点击（否则轻点和拖动会互相吞掉）

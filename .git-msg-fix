@@ -1,0 +1,5 @@
+fix(theater): 胶片条 pointer capture 延迟到确认拖动后，恢复点击切换
+
+无条件在 pointerdown 捕获指针会让浏览器把 click target 强制改为捕获元素，
+缩略图按钮的 onClick 全部失效。改为 move 中位移超阈值（确认拖动）后再捕获，
+纯点击路径零捕获，点击切换恢复；拖动中的鬼拖仍由 buttons===0 兜底。
