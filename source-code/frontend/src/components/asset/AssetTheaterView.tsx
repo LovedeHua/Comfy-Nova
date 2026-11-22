@@ -21,7 +21,6 @@ import {
   PanelRightOpen,
   PanelTopClose,
   PanelTopOpen,
-  RotateCcw,
   Star,
   X,
   ZoomIn,
@@ -208,7 +207,7 @@ export function AssetTheaterView({
   // 做法是直接改 Grid 滚动容器的 scrollLeft —— 它是普通 DOM，
   // 比驱动 Grid 的滚动 API 更直接，也不会打断虚拟化。
   const stripScrollRef = useRef<HTMLElement | null>(null)
-  const stripDragState = useRef<{ startX: number; startScrollLeft: number; moved: boolean } | null>(null)
+  const stripDragState = useRef<{ startX: number; startScrollLeft: number; moved: boolean; pointerId: number } | null>(null)
   // 拖动结束时置位，让紧随其后的 click 不触发切换
   const suppressStripClickRef = useRef(false)
   const [isStripDragging, setIsStripDragging] = useState(false)
@@ -248,8 +247,13 @@ export function AssetTheaterView({
     stripDragState.current = {
       startX: event.clientX,
       startScrollLeft: scroller.scrollLeft,
-      moved: false
+      moved: false,
+      pointerId: event.pointerId
     }
+    // 捕获指针：拖动途中滑出容器（甚至窗口）后 move 事件仍会路由回这里，
+    // 松手时必然收到 pointerup。没有这一步，指针离开容器再回来会被误判
+    // 成"仍在拖动"，出现不点击也能拖动的鬼拖。
+    event.currentTarget.setPointerCapture(event.pointerId)
     setIsStripDragging(true)
   }, [])
 
@@ -257,14 +261,24 @@ export function AssetTheaterView({
     const state = stripDragState.current
     const scroller = stripScrollRef.current
     if (!state || !scroller) return
+    // 兜底：某些环境下 capture 会失效（如浏览器扩展拦截）。此时指针滑出容器
+    // 期间 buttons 会归零，借它识别"键已经松了"，终止鬼拖。
+    if (event.buttons === 0) {
+      stripDragState.current = null
+      setIsStripDragging(false)
+      return
+    }
     const dx = event.clientX - state.startX
     // 超过阈值才算拖动，否则视为点击（否则轻点和拖动会互相吞掉）
     if (Math.abs(dx) > 3) state.moved = true
     if (state.moved) scroller.scrollLeft = state.startScrollLeft - dx
   }, [])
 
-  const handleStripPointerUp = useCallback(() => {
+  const handleStripPointerUp = useCallback((event?: React.PointerEvent<HTMLDivElement>) => {
     const state = stripDragState.current
+    if (state && event && event.currentTarget.hasPointerCapture?.(state.pointerId)) {
+      try { event.currentTarget.releasePointerCapture(state.pointerId) } catch { /* 已释放则忽略 */ }
+    }
     stripDragState.current = null
     setIsStripDragging(false)
     // 拖动结束后标记一下，避免这一下点击被当成"切换资产"
@@ -463,7 +477,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={goPrev}
               title={t('common.previous')}
-              className="absolute left-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/90 group-hover/stage:opacity-100"
+              className="absolute left-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/85 group-hover/stage:opacity-100"
             >
               <ChevronLeft className="size-5" />
             </Button>
@@ -475,7 +489,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={goNext}
               title={t('common.next')}
-              className="absolute right-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/90 group-hover/stage:opacity-100"
+              className="absolute right-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/85 group-hover/stage:opacity-100"
             >
               <ChevronRight className="size-5" />
             </Button>
@@ -486,8 +500,8 @@ export function AssetTheaterView({
           <div
             className={cn(
               'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-full',
-              'border border-border-subtle bg-surface/95 px-1.5 py-1 text-xs shadow-soft-lg',
-              'backdrop-blur-lg transition-opacity duration-300',
+              'border border-border-subtle bg-surface/70 px-1.5 py-1 text-xs shadow-soft-lg',
+              'backdrop-blur-md transition-opacity duration-300',
               controlsVisible ? 'opacity-100' : 'opacity-0',
               // 淡出时不接收点击，避免看不见还能点到
               !controlsVisible && 'pointer-events-none'
@@ -536,15 +550,6 @@ export function AssetTheaterView({
                   className="size-7 rounded-full"
                 >
                   <ZoomIn className="size-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={resetZoom}
-                  title={t('asset.theater.resetZoom')}
-                  className="size-7 rounded-full"
-                >
-                  <RotateCcw className="size-3.5" />
                 </Button>
               </>
             )}
