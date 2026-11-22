@@ -486,8 +486,8 @@ export function AssetTheaterView({
           <div
             className={cn(
               'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-full',
-              'border border-border-subtle bg-surface/85 px-1.5 py-1 text-xs shadow-soft-lg',
-              'backdrop-blur-md transition-opacity duration-300',
+              'border border-border-subtle bg-surface/95 px-1.5 py-1 text-xs shadow-soft-lg',
+              'backdrop-blur-lg transition-opacity duration-300',
               controlsVisible ? 'opacity-100' : 'opacity-0',
               // 淡出时不接收点击，避免看不见还能点到
               !controlsVisible && 'pointer-events-none'
@@ -503,7 +503,8 @@ export function AssetTheaterView({
               <Star className={cn('size-3.5', asset.isFavorite && 'fill-current')} />
             </Button>
 
-            <span className="min-w-[64px] px-1 text-center font-mono tabular-nums text-muted-foreground">
+            {/* 不设固定宽度也不许换行：由内容撑开，4720 这类大数字不会折行 */}
+            <span className="whitespace-nowrap px-1 text-center font-mono tabular-nums text-muted-foreground">
               {currentIndex + 1} / {assets.length}
             </span>
 
