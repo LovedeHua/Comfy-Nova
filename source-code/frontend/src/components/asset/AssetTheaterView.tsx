@@ -523,7 +523,7 @@ export function AssetTheaterView({
               避免四角各飘一块遮挡画面。鼠标静止后淡出，移动即恢复。 */}
           <div
             className={cn(
-              'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-xl',
+              'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-md',
               'border border-border-subtle bg-surface/70 px-1.5 py-1 text-xs shadow-soft-lg',
               'backdrop-blur-md transition-opacity duration-300',
               controlsVisible ? 'opacity-100' : 'opacity-0',
@@ -536,7 +536,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={() => void toggleFavorite(asset.id)}
               title={t('asset.batchFavorite')}
-              className={cn('size-7 rounded-lg', asset.isFavorite && 'text-warning')}
+              className={cn('size-7 rounded-md', asset.isFavorite && 'text-warning')}
             >
               <Star className={cn('size-3.5', asset.isFavorite && 'fill-current')} />
             </Button>
@@ -554,7 +554,7 @@ export function AssetTheaterView({
                   size="icon"
                   onClick={() => zoomTo(transform.scale / 1.25)}
                   title={t('asset.theater.zoomOut')}
-                  className="size-7 rounded-lg"
+                  className="size-7 rounded-md"
                 >
                   <ZoomOut className="size-3.5" />
                 </Button>
@@ -571,7 +571,7 @@ export function AssetTheaterView({
                   size="icon"
                   onClick={() => zoomTo(transform.scale * 1.25)}
                   title={t('asset.theater.zoomIn')}
-                  className="size-7 rounded-lg"
+                  className="size-7 rounded-md"
                 >
                   <ZoomIn className="size-3.5" />
                 </Button>
@@ -591,7 +591,7 @@ export function AssetTheaterView({
                   onClick={() => toggleChrome(region)}
                   title={`${t(isHidden ? "asset.theater.chrome.show" : "asset.theater.chrome.hide")} ${t(`asset.theater.chrome.${region}`)}`}
                   className={cn(
-                    'size-7 rounded-lg',
+                    'size-7 rounded-md',
                     isHidden ? 'text-muted-foreground' : 'text-foreground'
                   )}
                 >
@@ -607,7 +607,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={onClose}
               title={t('asset.theater.exitHint')}
-              className="size-7 rounded-lg"
+              className="size-7 rounded-md"
             >
               <X className="size-3.5" />
             </Button>
