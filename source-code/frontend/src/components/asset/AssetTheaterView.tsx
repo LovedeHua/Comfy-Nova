@@ -578,11 +578,6 @@ export function AssetTheaterView({
               <Star className={cn('size-3.5', asset.isFavorite && 'fill-current')} />
             </Button>
 
-            {/* 不设固定宽度也不许换行：由内容撑开，4720 这类大数字不会折行 */}
-            <span className="whitespace-nowrap px-1 text-center font-mono tabular-nums text-muted-foreground">
-              {currentIndex + 1} / {assets.length}
-            </span>
-
             {asset.type !== 'video' && (
               <>
                 <div className="mx-1 h-4 w-px bg-border-subtle" />
@@ -615,6 +610,16 @@ export function AssetTheaterView({
               </>
             )}
 
+            <div className="mx-1 h-4 w-px bg-border-subtle" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              title={t('asset.theater.exitHint')}
+              className="size-7 rounded-md"
+            >
+              <X className="size-3.5" />
+            </Button>
           </div>
           <div
             className={cn(
@@ -623,6 +628,11 @@ export function AssetTheaterView({
               isToolbarCollapsed ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
             )}
           >
+            {/* 不设固定宽度也不许换行：由内容撑开，4720 这类大数字不会折行 */}
+            <span className="whitespace-nowrap px-1 text-center font-mono tabular-nums text-muted-foreground">
+              {currentIndex + 1} / {assets.length}
+            </span>
+
             <div className="mx-1 h-4 w-px bg-border-subtle" />
 
             {CHROME_REGIONS.map((region) => {
@@ -647,15 +657,6 @@ export function AssetTheaterView({
 
             <div className="mx-1 h-4 w-px bg-border-subtle" />
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              title={t('asset.theater.exitHint')}
-              className="size-7 rounded-md"
-            >
-              <X className="size-3.5" />
-            </Button>
 
 
           </div>
@@ -670,11 +671,11 @@ export function AssetTheaterView({
             onMouseEnter={() => setIsArrowHover(true)}
             onMouseLeave={() => setIsArrowHover(false)}
             className={cn(
-              'absolute left-1/2 top-0 z-30 flex size-9 -translate-x-1/2 items-center justify-center pointer-events-auto',
+              'absolute left-1/2 top-0 z-30 flex h-[41px] w-8 -translate-x-1/2 items-center justify-center pointer-events-auto',
               'text-muted-foreground transition-all duration-200 hover:text-foreground',
               isToolbarCollapsed
                 ? cn(
-                    'rounded-b-md border border-x-0 border-t-0 border-border-subtle bg-surface/50',
+                    'h-[41px] rounded-b-md border border-x-0 border-t-0 border-border-subtle bg-surface/50',
                     isArrowHover ? 'opacity-100 bg-surface/80' : 'opacity-0'
                   )
                 : cn(
