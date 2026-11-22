@@ -189,6 +189,31 @@ export function AssetTheaterView({
 
   // 鼠标侧键/浏览器后退：进入影院时压一条 history 占位，后退事件被拦截后
   // 转为关闭影院。否则后退会把整个应用路由弹走，而用户预期只是退出全屏浮层。
+    // Radix 弹层（Dialog/Popover）打开时 react-remove-scroll 会把 body 设为
+  // pointer-events:none；若弹层未正常卸载（外部受控 open 卡住、异常关闭），
+  // body 锁残留，整页点击失效 —— 胶片条"点不动拖不动"的元凶。
+  // 影院挂载期间守护：检测到 body 被锁且页面上没有仍打开的 Radix 弹层时，
+  // 强制恢复 body 可交互。
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const body = document.body
+      if (getComputedStyle(body).pointerEvents !== 'none') return
+      // 仍有"可见的" Radix 弹层时不抢（那是弹层自己的合法锁）。
+      // 判定可见性而非存在性：display:none 的残留 DOM（data-state 仍是 open）
+      // 不能算数，否则锁死永不恢复。
+      const anyDialogOpen = Array.from(document.querySelectorAll('[role=dialog][data-state=open], [role=alertdialog][data-state=open]'))
+        .some(d => (d as HTMLElement).offsetParent !== null || d.getClientRects().length > 0)
+      const anyRadixPopup = Array.from(document.querySelectorAll('[data-radix-popper-content-wrapper]'))
+        .some(d => (d as HTMLElement).offsetParent !== null || d.getClientRects().length > 0)
+      if (anyDialogOpen || anyRadixPopup) return
+      body.style.pointerEvents = 'auto'
+      document.documentElement.style.pointerEvents = 'auto'
+    }, 500)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  // 鼠标侧键/浏览器后退：进入影院时压一条 history 占位，后退事件被拦截后
+  // 后退操作被拦下转为关闭影院，避免把整个应用路由弹回资产库外。
   useEffect(() => {
     if (typeof window.history.pushState !== 'function') return
     window.history.pushState({ theater: true }, '')
@@ -252,9 +277,25 @@ export function AssetTheaterView({
     return () => container.removeEventListener('wheel', onWheel)
   }, [assets.length])
 
+  /** 找 Grid 的真实滚动容器；带缓存，找不到时重扫（Grid 是延迟渲染的） */
+  const resolveStripScroller = useCallback((): HTMLElement | null => {
+    if (stripScrollRef.current && stripScrollRef.current.isConnected) return stripScrollRef.current
+    const container = stripContainerRef.current
+    if (!container) return null
+    for (const node of container.querySelectorAll<HTMLElement>('*')) {
+      if (node.scrollWidth > node.clientWidth + 1) {
+        stripScrollRef.current = node
+        return node
+      }
+    }
+    return null
+  }, [])
+
   const handleStripPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
-    const scroller = stripScrollRef.current
+    // Grid 在条挂载后才渲染，挂载时找不到滚动容器是常态；
+    // 按下此刻动态解析，绝不因时序问题把拖动/点击吞掉。
+    const scroller = resolveStripScroller()
     if (!scroller) return
     stripDragState.current = {
       startX: event.clientX,
