@@ -563,7 +563,7 @@ export function AssetTheaterView({
           <div className="absolute left-1/2 top-0 z-20">
           <div
             className={cn(
-              'absolute right-[18px] top-0 flex items-center gap-0.5 rounded-bl-md border-b border-l border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
+              'absolute right-4 top-0 flex items-center gap-0.5 rounded-bl-md border-b border-l border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
               'transition-[transform,opacity] duration-200',
               isToolbarCollapsed ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
             )}
@@ -609,21 +609,10 @@ export function AssetTheaterView({
                 </Button>
               </>
             )}
-
-            <div className="mx-1 h-4 w-px bg-border-subtle" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              title={t('asset.theater.exitHint')}
-              className="size-7 rounded-md"
-            >
-              <X className="size-3.5" />
-            </Button>
           </div>
           <div
             className={cn(
-              'absolute left-[18px] top-0 flex items-center gap-0.5 rounded-br-md border-b border-r border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
+              'absolute left-4 top-0 flex items-center gap-0.5 rounded-br-md border-b border-r border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
               'transition-[transform,opacity] duration-200',
               isToolbarCollapsed ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
             )}
@@ -659,6 +648,18 @@ export function AssetTheaterView({
 
 
 
+            <div className="mx-1 h-4 w-px bg-border-subtle" />
+
+            <div className="mx-1 h-4 w-px bg-border-subtle" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              title={t('asset.theater.exitHint')}
+              className="size-7 rounded-md"
+            >
+              <X className="size-3.5" />
+            </Button>
           </div>
 
           {/* 中轴切换按钮：恒定位置（悬浮栏正中），不随两段滑出。
@@ -679,7 +680,7 @@ export function AssetTheaterView({
                     isArrowHover ? 'opacity-100 bg-surface/80' : 'opacity-0'
                   )
                 : cn(
-                    'rounded-b-md border-b border-border-subtle bg-surface/50'
+                    'border-b border-border-subtle bg-surface/50'
                   )
             )}
           >
