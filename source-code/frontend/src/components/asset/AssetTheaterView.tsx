@@ -557,12 +557,13 @@ export function AssetTheaterView({
             </Button>
           )}
 
-          {/* 单条工具条：贴顶居中，无自动隐藏，始终可用 */}
+          {/* 分体工具条：左右两段贴顶，中轴缺口给恒定的切换按钮。
+              按钮是容器子元素、absolute 定位到中轴 —— 两段滑出时它不动，
+              实现"同一个按钮"在悬浮栏中轴切换样式。 */}
+          <div className="absolute left-1/2 top-0 z-20">
           <div
             className={cn(
-              'absolute left-1/2 top-0 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-b-md',
-              'border border-x-0 border-t-0 border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
-              // 收起时整体上滑出屏幕（把自身高度 + 圆角全部推上去）
+              'absolute right-[18px] top-0 flex items-center gap-0.5 rounded-bl-md border-b border-l border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
               'transition-[transform,opacity] duration-200',
               isToolbarCollapsed ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
             )}
@@ -614,6 +615,14 @@ export function AssetTheaterView({
               </>
             )}
 
+          </div>
+          <div
+            className={cn(
+              'absolute left-[18px] top-0 flex items-center gap-0.5 rounded-br-md border-b border-r border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75',
+              'transition-[transform,opacity] duration-200',
+              isToolbarCollapsed ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+            )}
+          >
             <div className="mx-1 h-4 w-px bg-border-subtle" />
 
             {CHROME_REGIONS.map((region) => {
@@ -648,44 +657,37 @@ export function AssetTheaterView({
               <X className="size-3.5" />
             </Button>
 
-            {/* 收起：作为工具条最后一个元素，融入且跟随工具条移动 */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsToolbarCollapsed(true)}
-              title={t('asset.theater.hideToolbar')}
-              className="size-7 rounded-md text-muted-foreground hover:text-foreground"
-            >
-              <ChevronUp className="size-3" />
-            </Button>
-
 
           </div>
 
-          {/* 收起后的展开把手：工具条滑出后出现在顶部中间，
-              此刻工具条已不在屏幕上，不存在重叠 */}
-          {isToolbarCollapsed && (
-            <div
-              className="group/handle absolute left-1/2 top-0 z-30 -translate-x-1/2 size-7"
-              onMouseEnter={() => setIsArrowHover(true)}
-              onMouseLeave={() => setIsArrowHover(false)}
-            >
-              <button
-                type="button"
-                onClick={() => setIsToolbarCollapsed(false)}
-                aria-label={t('asset.theater.showToolbar')}
-                title={t('asset.theater.showToolbar')}
-                className={cn(
-                  'pointer-events-auto flex size-full items-center justify-center',
-                  'rounded-b-md border border-x-0 border-t-0 border-border-subtle bg-surface/50',
-                  'text-muted-foreground transition-all duration-200 hover:bg-surface/80 hover:text-foreground',
-                  isArrowHover ? 'opacity-100' : 'opacity-0'
-                )}
-              >
-                <ChevronDown className="size-3" />
-              </button>
-            </div>
-          )}
+          {/* 中轴切换按钮：恒定位置（悬浮栏正中），不随两段滑出。
+              展开态融入工具条缺口（补齐底色与底边），收起态为独立把手。 */}
+          <button
+            type="button"
+            onClick={() => setIsToolbarCollapsed((v) => !v)}
+            aria-label={isToolbarCollapsed ? t('asset.theater.showToolbar') : t('asset.theater.hideToolbar')}
+            title={isToolbarCollapsed ? t('asset.theater.showToolbar') : t('asset.theater.hideToolbar')}
+            onMouseEnter={() => setIsArrowHover(true)}
+            onMouseLeave={() => setIsArrowHover(false)}
+            className={cn(
+              'absolute left-1/2 top-0 z-30 flex size-9 -translate-x-1/2 items-center justify-center pointer-events-auto',
+              'text-muted-foreground transition-all duration-200 hover:text-foreground',
+              isToolbarCollapsed
+                ? cn(
+                    'rounded-b-md border border-x-0 border-t-0 border-border-subtle bg-surface/50',
+                    isArrowHover ? 'opacity-100 bg-surface/80' : 'opacity-0'
+                  )
+                : cn(
+                    'rounded-b-md border-b border-border-subtle bg-surface/50'
+                  )
+            )}
+          >
+            {isToolbarCollapsed
+              ? <ChevronDown className="size-3" />
+              : <ChevronUp className="size-3" />}
+          </button>
+          </div>
+
         </div>
 
         {!chromeHidden.detail && (
