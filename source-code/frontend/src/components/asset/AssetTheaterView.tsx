@@ -32,7 +32,6 @@ import { useAssetStore } from '@/stores/useAssetStore'
 import { useChromeStore, type ChromeRegion } from '@/stores/useChromeStore'
 import { useElementSize } from '@/hooks/useElementSize'
 import { useImageZoomPan } from '@/hooks/useImageZoomPan'
-import { useIdleVisibility } from '@/hooks/useIdleVisibility'
 import { AssetInfoPanel } from './AssetInfoPanel'
 import type { AssetInfoPanelProps } from './AssetInfoPanel'
 import type { LucideIcon } from 'lucide-react'
@@ -127,8 +126,6 @@ export function AssetTheaterView({
     handleDoubleClick
   } = useImageZoomPan({ onScaleChange: setScaleLabel })
 
-  // 鼠标静止 2.5 秒后收起工具条，让画面尽量干净；移动/按键立刻恢复。
-  const { isVisible: controlsVisible, wake: wakeControls } = useIdleVisibility({ idleDelay: 2500 })
 
   useEffect(() => {
     setIsFullLoaded(false)
@@ -137,10 +134,6 @@ export function AssetTheaterView({
     resetZoom()
   }, [asset.id, resetZoom])
 
-  // 正在拖动画面时保持工具条可见：拖到画面边缘时用户仍需要看到控件
-  useEffect(() => {
-    if (isPanning) wakeControls()
-  }, [isPanning, wakeControls])
 
   const goPrev = useCallback(() => {
     if (hasPrev) onNavigate(assets[currentIndex - 1])
@@ -501,7 +494,7 @@ export function AssetTheaterView({
               size="icon"
               onClick={goPrev}
               title={t('common.previous')}
-              className="absolute left-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/85 group-hover/stage:opacity-100"
+              className="absolute left-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/50 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/70 group-hover/stage:opacity-100"
             >
               <ChevronLeft className="size-5" />
             </Button>
@@ -513,22 +506,17 @@ export function AssetTheaterView({
               size="icon"
               onClick={goNext}
               title={t('common.next')}
-              className="absolute right-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/70 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/85 group-hover/stage:opacity-100"
+              className="absolute right-3 top-1/2 size-9 -translate-y-1/2 rounded-full bg-surface/50 opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-surface/70 group-hover/stage:opacity-100"
             >
               <ChevronRight className="size-5" />
             </Button>
           )}
 
-          {/* 单条悬浮工具条：页码 / 收藏 / 缩放 / 布局 / 退出全部收进来，
-              避免四角各飘一块遮挡画面。鼠标静止后淡出，移动即恢复。 */}
+          {/* 单条工具条：贴顶居中，无自动隐藏，始终可用 */}
           <div
             className={cn(
-              'absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-md',
-              'border border-border-subtle bg-surface/70 px-1.5 py-1 text-xs shadow-soft-lg',
-              'backdrop-blur-md transition-opacity duration-300',
-              controlsVisible ? 'opacity-100' : 'opacity-0',
-              // 淡出时不接收点击，避免看不见还能点到
-              !controlsVisible && 'pointer-events-none'
+              'absolute left-1/2 top-0 z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-b-md',
+              'border border-x-0 border-t-0 border-border-subtle bg-surface/50 px-1.5 py-1.5 text-xs transition-colors hover:bg-surface/75'
             )}
           >
             <Button
