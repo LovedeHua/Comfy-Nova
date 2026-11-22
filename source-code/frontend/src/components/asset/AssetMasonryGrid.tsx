@@ -81,10 +81,20 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
           setColumnCount(count)
         }
       }
-      
+
       updateColumnCount()
       window.addEventListener('resize', updateColumnCount)
-      return () => window.removeEventListener('resize', updateColumnCount)
+      // 容器宽度还会随软件布局变化（分类树拖宽/收起、详情栏开关），
+      // window resize 监听不到这些，必须观察容器自身尺寸。
+      let observer: ResizeObserver | null = null
+      if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(updateColumnCount)
+        observer.observe(containerRef.current)
+      }
+      return () => {
+        window.removeEventListener('resize', updateColumnCount)
+        observer?.disconnect()
+      }
     }, [thumbnailSize])
 
     const columns = useMemo(() => {
