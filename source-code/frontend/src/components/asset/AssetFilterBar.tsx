@@ -21,6 +21,7 @@ import {
   Star,
   Workflow
 } from 'lucide-react'
+import { ScopeBadge } from '@/components/common/ScopeBadge'
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -265,7 +266,8 @@ export function AssetFilterBar() {
         </Button>
       )}
 
-      <div className="ml-auto text-xs text-muted-foreground">
+      <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+        <ScopeBadge category="gallery" />
         {t('asset.filter.resultCount', { shown: filteredCount, total: assets.length })}
       </div>
     </div>
