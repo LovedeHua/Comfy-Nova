@@ -41,6 +41,10 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     const containerRef = useRef<HTMLDivElement>(null)
     const [columnCount, setColumnCount] = useState(4)
+  // 列的实际宽度：contain-intrinsic-size 的估算必须按列宽算（卡片渲染宽度），
+  // 用 thumbnailSize 估算会随窗口/布局宽度产生虚高或塌陷，
+  // 表现为滚动区域与界面显示区域不同步。
+  const [columnWidth, setColumnWidth] = useState(0)
 
     useImperativeHandle(ref, () => ({
       getCardRefs: () => cardRefs.current
@@ -79,6 +83,8 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
           const containerWidth = containerRef.current.offsetWidth - 48
           const count = Math.max(1, Math.floor((containerWidth + GAP) / (thumbnailSize + GAP)))
           setColumnCount(count)
+          // 列宽与列数同步重算（间隙占宽：总数-1 个 GAP）
+          setColumnWidth(Math.max(1, Math.floor((containerWidth - (count - 1) * GAP) / count)))
         }
       }
 
@@ -202,7 +208,7 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
                     style={{
                       contentVisibility: 'auto',
                       containIntrinsicSize: `auto ${Math.round(
-                        thumbnailSize * ((asset.height || 1) / (asset.width || 1))
+                        (columnWidth || thumbnailSize) * ((asset.height || 1) / (asset.width || 1))
                       )}px`
                     } as CSSProperties}
                   >

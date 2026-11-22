@@ -647,40 +647,45 @@ export function AssetTheaterView({
             >
               <X className="size-3.5" />
             </Button>
+
+            {/* 收起：作为工具条最后一个元素，融入且跟随工具条移动 */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsToolbarCollapsed(true)}
+              title={t('asset.theater.hideToolbar')}
+              className="size-7 rounded-md text-muted-foreground hover:text-foreground"
+            >
+              <ChevronUp className="size-3" />
+            </Button>
+
+
           </div>
 
-          {/* 收起/展开切换按钮：常驻顶部中间（悬浮栏中轴），
-              展开时融合进工具条外观，收起时是独立把手。不随工具条滑出。 */}
-          <button
-            type="button"
-            onClick={() => setIsToolbarCollapsed((v) => !v)}
-            aria-label={isToolbarCollapsed ? t('asset.theater.showToolbar') : t('asset.theater.hideToolbar')}
-            title={isToolbarCollapsed ? t('asset.theater.showToolbar') : t('asset.theater.hideToolbar')}
-            onMouseEnter={() => setIsArrowHover(true)}
-            onMouseLeave={() => setIsArrowHover(false)}
-            className={cn(
-              'absolute left-1/2 top-0 z-30 -translate-x-1/2 flex items-center justify-center pointer-events-auto',
-              'text-muted-foreground transition-all duration-200 hover:text-foreground',
-              // 展开时：融入工具条（同底色同高度，边界消失）；
-              // 收起时：独立小把手，平时隐形，鼠标靠近顶部才显现
-              isToolbarCollapsed
-                ? cn(
-                    'size-7 rounded-b-md border border-x-0 border-t-0 border-border-subtle bg-surface/50',
-                    isArrowHover ? 'opacity-100 bg-surface/80' : 'opacity-0'
-                  )
-                : cn(
-                    'h-[26px] w-8 bg-transparent hover:bg-surface/60 rounded-b-md'
-                  )
-            )}
-          >
-            {isToolbarCollapsed
-              ? <ChevronDown className="size-3" />
-              : <ChevronUp className="size-3" />}
-          </button>
-
-
-          {/* 收起/展开把手：悬浮栏可见时是"收起"；收起后固定顶部中间，
-              鼠标靠近才显现。独立于工具条，不随其滑出。 */}
+          {/* 收起后的展开把手：工具条滑出后出现在顶部中间，
+              此刻工具条已不在屏幕上，不存在重叠 */}
+          {isToolbarCollapsed && (
+            <div
+              className="group/handle absolute left-1/2 top-0 z-30 -translate-x-1/2 size-7"
+              onMouseEnter={() => setIsArrowHover(true)}
+              onMouseLeave={() => setIsArrowHover(false)}
+            >
+              <button
+                type="button"
+                onClick={() => setIsToolbarCollapsed(false)}
+                aria-label={t('asset.theater.showToolbar')}
+                title={t('asset.theater.showToolbar')}
+                className={cn(
+                  'pointer-events-auto flex size-full items-center justify-center',
+                  'rounded-b-md border border-x-0 border-t-0 border-border-subtle bg-surface/50',
+                  'text-muted-foreground transition-all duration-200 hover:bg-surface/80 hover:text-foreground',
+                  isArrowHover ? 'opacity-100' : 'opacity-0'
+                )}
+              >
+                <ChevronDown className="size-3" />
+              </button>
+            </div>
+          )}
         </div>
 
         {!chromeHidden.detail && (
