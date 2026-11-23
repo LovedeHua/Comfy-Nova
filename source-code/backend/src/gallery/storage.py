@@ -97,16 +97,25 @@ class GalleryStorage:
             if should_flush:
                 self.save()
 
-    def save(self) -> bool:
-        """保存资产库数据
+    def save(self, force: bool = False) -> bool:
+        """保存资产库数据。
 
         批量模式下只置脏标记、不落盘，由 batch_updates() 退出时统一写一次。
+        force=True 时无视批处理状态立即落盘——用户显式操作（如保存设置）
+        必须立刻持久化，不能因为恰好有扫描在批处理区间里就被延后甚至丢掉。
         """
         if self._data is None:
             return False
 
         with self._lock:
-            if self._batch_depth > 0:
+            if self._batch_depth > 0 and not force:
+                # 落在批处理区间内：只置脏标记，由上下文退出时统一落盘。
+                # 记录 depth 便于排查"设置保存了但磁盘没变"——
+                # 那种情况往往是某个 batch_updates 没有正常退出。
+                logger.info(
+                    f"[GalleryStorage] save 延后（batch_depth={self._batch_depth}），"
+                    f"等待批处理退出后统一落盘"
+                )
                 self._dirty = True
                 return True
             self._dirty = False
@@ -200,7 +209,8 @@ class GalleryStorage:
             data.settings.last_scan_time = last_scan_time
         else:
             data.settings.last_scan_time = datetime.now().isoformat()
-        return self.save()
+        # 强制落盘：设置是用户显式操作，不能因为后台扫描正在批处理而被延后
+        return self.save(force=True)
 
     def update_nsfw_settings(
         self,
