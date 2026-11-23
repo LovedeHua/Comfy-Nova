@@ -246,15 +246,7 @@ export function AssetTheaterView({
     }
   }, [onClose])
 
-  // 轨道跟随当前资产滚动
-  useEffect(() => {
-    if (currentIndex < 0) return
-    gridRef.current?.scrollToCell({
-      columnIndex: currentIndex,
-      rowIndex: 0,
-      columnAlign: 'center'
-    })
-  }, [currentIndex, gridRef])
+
 
   // 胶片条的滚轮横向滚动与拖动
   //
@@ -474,6 +466,32 @@ export function AssetTheaterView({
     [stripBarHeight]
   )
 
+  // 轨道跟随当前资产滚动。
+  // 关键：只在选中项已经完全移出可视区时才滚动 —— 之前无条件 scrollToCell
+  // + columnAlign:'center'，导致每点一张列表都被拉到居中，看起来"位置一直变"。
+  useEffect(() => {
+    const scroller = stripScrollRef.current
+    if (!scroller || currentIndex < 0) return
+
+    const cellW = stripCellSize + STRIP_GAP
+    const cellLeft = currentIndex * cellW
+    const cellRight = cellLeft + cellW
+    const viewLeft = scroller.scrollLeft
+    const viewRight = viewLeft + scroller.clientWidth
+
+    // 已在视野内（留一点余量）就不动
+    const margin = cellW / 2
+    if (cellLeft >= viewLeft - margin && cellRight <= viewRight + margin) return
+
+    // 不可见时最小幅度滚动，把它带到最近的边缘，而不是居中
+    const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
+    const target =
+      cellLeft < viewLeft
+        ? cellLeft - STRIP_GAP          // 向左移入
+        : cellRight - scroller.clientWidth + STRIP_GAP  // 向右移入
+    scroller.scrollLeft = Math.min(Math.max(0, target), maxLeft)
+  }, [currentIndex, stripCellSize])
+
   // Grid 内容区高度：容器高度扣掉 1px 上边框，避免比可用空间高 1px 造成对齐补偿
   const STRIP_BORDER = 1
   const stripRowInnerHeight = Math.max(1, stripBarHeight - STRIP_BORDER)
@@ -498,17 +516,10 @@ export function AssetTheaterView({
       <div style={{ ...style, padding: STRIP_GAP / 2 }}>
         <div
           role="button"
-          tabIndex={0}
           title={item.filename}
           onClick={() => {
             if (stripCellData.shouldSuppressClick()) return
             stripCellData.onNavigate(item)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              stripCellData.onNavigate(item)
-            }
           }}
           className={cn(
             'box-border size-full cursor-pointer overflow-hidden rounded-md bg-surface-active',
@@ -908,7 +919,7 @@ export function AssetTheaterView({
             rowHeight={stripRowInnerHeight}
             defaultHeight={stripRowInnerHeight}
             defaultWidth={stripSize.width}
-            overscanCount={4}
+            overscanCount={12}
             cellComponent={StripCell}
             cellProps={stripCellData}
             className="scrollbar-thin"
