@@ -136,6 +136,16 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
       console.log('[AssetSettingsDialog] 保存结果:', success)
 
       if (success) {
+        // 用后端实际保存的值回填输入框：输入框留空表示"不修改"，
+        // 回填后用户能立刻确认输入库路径到底是什么，而不是看到一个空框
+        // 以为没保存成功。
+        try {
+          const saved = await getSettings()
+          if (saved?.inputLibraryPath !== undefined) setInputLibraryPath(saved.inputLibraryPath)
+          if (saved?.libraryPath !== undefined) setLibraryPath(saved.libraryPath)
+        } catch {
+          // 回填失败不影响保存结果
+        }
         showToast(t('asset.settingsDialog.saveSuccess'), 'success')
         onOpenChange(false)
         console.log('[AssetSettingsDialog] 启动后台扫描...')

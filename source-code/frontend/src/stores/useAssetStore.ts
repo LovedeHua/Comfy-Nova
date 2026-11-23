@@ -1011,7 +1011,11 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         return true
       }
 
-      const result = await window.pywebview.api.gallery_save_settings(libraryPath, inputLibraryPath)
+      // 输入框留空表示"不修改输入库路径"，不要用空串覆盖已有配置
+      const result = await window.pywebview.api.gallery_save_settings(
+        libraryPath,
+        inputLibraryPath || undefined
+      )
       if (result.success) {
         const currentSettings = get().settings
         // 合并保留 readdir 之外的所有已有字段（视图预览偏好、胶片条高度等），

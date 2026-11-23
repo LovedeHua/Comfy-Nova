@@ -252,9 +252,11 @@ class GalleryController:
             }
         """
         try:
+            # input_library_path 为空时视为"不修改"，避免用户只改输出路径
+            # 却把已配置的输入库清空（历史 bug：输入路径保存不下来）。
             gallery_storage.update_settings(
                 library_path=library_path,
-                input_library_path=input_library_path,
+                input_library_path=input_library_path or None,
             )
             return {"success": True}
         except Exception as e:

@@ -181,12 +181,20 @@ class GalleryStorage:
         library_path: Optional[str] = None,
         last_scan_time: Optional[str] = None,
         input_library_path: Optional[str] = None,
+        clear_input_library_path: bool = False,
     ) -> bool:
-        """更新设置"""
+        """更新设置。
+
+        空字符串不再覆盖已有输入库路径：用户只想改输出路径、输入框恰好留空时，
+        此前会把已配置的输入库清掉，表现为"输入路径保存不下来"。
+        需要真正清空时传 clear_input_library_path=True。
+        """
         data = self.load()
         if library_path is not None:
             data.settings.library_path = library_path
-        if input_library_path is not None:
+        if clear_input_library_path:
+            data.settings.input_library_path = ""
+        elif input_library_path:
             data.settings.input_library_path = input_library_path
         if last_scan_time is not None:
             data.settings.last_scan_time = last_scan_time
