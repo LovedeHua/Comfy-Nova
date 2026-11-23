@@ -90,6 +90,9 @@ function safeString(value: unknown): string {
   return String(value)
 }
 
+/** 已成功解码过的原图 URL。跨挂载保留，用于进入影院时首帧即显示高清层。 */
+const loadedFullImages = new Set<string>()
+
 export function AssetTheaterView({
   asset,
   assets,
@@ -122,7 +125,22 @@ export function AssetTheaterView({
   const gridRef = useGridRef(null)
   // 原图是否已加载完成：切换资产时必须复位，否则会沿用上一张的 true 导致
   // 新图直接以"已加载"外观出现，实际还在下载。
-  const [isFullLoaded, setIsFullLoaded] = useState(false)
+  // 已解码原图的 URL 集合：进入影院时若当前图已在此集合里，
+  // 首帧就直接显示高清层，不必先铺缩略图再淡入。
+  const [isFullLoaded, setIsFullLoaded] = useState(() =>
+    loadedFullImages.has(asset.url ?? '')
+  )
+  /*
+   * 双缓冲：影院切换图片时不出现空白帧。
+   *
+   * 问题：React 直接改 <img src> 时，浏览器会先清空旧位图再解码新图，
+   * 中间那一帧舞台是空白的（用户看到的"闪一下"）。
+   *
+   * 做法：把"正在展示的图"(shown) 与"正在加载的图"(loading) 分开。
+   * 新图先在隐藏层预解码，decode() 完成后再把 shown 换成它 —— 切换是原子的，
+   * 全程都有已解码位图覆盖舞台。首帧（进入影院）直接建两层即可。
+   */
+  const [shownAsset, setShownAsset] = useState(asset)
   // 悬浮栏收起状态：收起后仅顶部中间留一个鼠标靠近才显现的箭头
   const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false)
   const [isArrowHover, setIsArrowHover] = useState(false)
@@ -146,15 +164,31 @@ export function AssetTheaterView({
   } = useImageZoomPan({ onScaleChange: setScaleLabel })
 
 
-  // 切换资产时在渲染期同步重置加载态：
-  // 不能放在 effect 里——原图 ref 的缓存检查（commit 阶段）会先于 effect 执行，
-  // 若 effect 再设 false 就会把已命中的缓存图重新藏回缩略图，产生闪烁。
-  // 渲染期 setState 是 React 允许的同步重置模式（同一组件内、commit 前收敛）。
-  const lastAssetIdRef = useRef(asset.id)
-  if (lastAssetIdRef.current !== asset.id) {
-    lastAssetIdRef.current = asset.id
-    setIsFullLoaded(false)
-  }
+  /*
+   * 双缓冲切换：新图预解码完成后再替换 shownAsset，避免空白帧。
+   *
+   * 用 <img>.decode() 显式等待解码而非只等 onload —— onload 只代表数据到了，
+   * 位图可能还没解码，此时替换 src 仍会有短暂空白。decode() 返回的 Promise
+   * 在位图可绘制时 resolve，是最可靠的"可以安全切换"信号。
+   */
+  useEffect(() => {
+    if (asset.id === shownAsset.id) return
+    let cancelled = false
+    const probe = new Image()
+    probe.src = asset.url as string
+    const commit = () => {
+      if (cancelled) return
+      if (asset.url) loadedFullImages.add(asset.url)
+      setShownAsset(asset)
+      setIsFullLoaded(true)
+    }
+    const decoded = probe.decode ? probe.decode() : Promise.resolve()
+    decoded.then(commit).catch(() => {
+      // 解码失败（或 Safari 旧版不支持）时仍要切换，否则会卡在上一张
+      commit()
+    })
+    return () => { cancelled = true }
+  }, [asset, shownAsset.id])
 
   useEffect(() => {
     // 切换资产时必须回到适应窗口，否则会沿用上一张的缩放与位移
@@ -626,8 +660,11 @@ export function AssetTheaterView({
                 }}
               >
                 <img
-                  key={`${asset.id}-thumb`}
-                  src={asset.thumbnail}
+                  // 关键：不设 key。设 key 会让 React 在切换时销毁重建 <img>，
+                  // 旧位图瞬间消失、新图尚未解码，舞台就会出现一帧空白（闪烁）。
+                  // 去掉 key 后 React 复用同一元素，src 变更期间浏览器保留旧位图，
+                  // 直到新图就绪才替换 —— 全程不出现空白帧。
+                  src={shownAsset.thumbnail}
                   alt=""
                   aria-hidden
                   draggable={false}
@@ -637,18 +674,24 @@ export function AssetTheaterView({
                   )}
                 />
                 <img
-                  key={`${asset.id}-full`}
-                  src={asset.url}
-                  alt={asset.filename}
+                  // 同上：去掉 key，避免销毁重建导致的空白帧
+                  src={shownAsset.url}
+                  alt={shownAsset.filename}
                   draggable={false}
                   decoding="async"
                   // 缓存竞态：原图已在浏览器缓存时 onLoad 可能不再触发，
                   // 会导致一直停在模糊缩略图上（看起来像"闪一下后没切换"）。
                   // 挂载时主动检查 complete，命中就直接切到高清原图。
                   ref={(el) => {
-                    if (el && el.complete && el.naturalWidth > 0) setIsFullLoaded(true)
+                    if (el && el.complete && el.naturalWidth > 0) {
+                      if (shownAsset.url) loadedFullImages.add(shownAsset.url)
+                      setIsFullLoaded(true)
+                    }
                   }}
-                  onLoad={() => setIsFullLoaded(true)}
+                  onLoad={() => {
+                    if (shownAsset.url) loadedFullImages.add(shownAsset.url)
+                    setIsFullLoaded(true)
+                  }}
                   className={cn(
                     'absolute inset-0 size-full select-none rounded-lg object-contain transition-opacity duration-150',
                     isFullLoaded ? 'opacity-100' : 'opacity-0'
