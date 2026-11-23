@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils'
 import type { Asset } from '@/mocks/asset'
 import type { AssetMasonryGridRef } from '@/components/asset'
 import type { AssetCategory } from '@/mocks/asset'
+import { markImageDecoded } from '@/lib/decodedImages'
 
 // 首次进入资产库才做自动扫描+加载；从其他模块切回时数据仍在 store，
 // 不再重复请求，避免缩略图重新加载造成整屏刷新闪烁。
@@ -463,12 +464,38 @@ export default function AssetLibraryPage() {
     }, 250)
   }, [isBatchMode])
 
-  const handleOpenTheater = useCallback((asset: Asset) => {
-    // 进入影院前先预取当前原图：组件挂载时图片已在浏览器缓存，
-    // ref 的 complete 检查会直接切到高清层，消除"缩略图闪一下"的过渡。
+  /*
+   * 进入影院：先预解码当前原图，再打开影院。
+   *
+   * 影院首帧若显示缩略图、等原图就绪再切高清，会有一次清晰度跳变（闪烁感）。
+   * 这里在打开前就用 decode() 等待原图可绘制，组件挂载时首帧直接是高清图。
+   * 图片已在缓存时 decode() 立即 resolve，不会有额外延迟。
+   */
+  const handleOpenTheater = useCallback(async (asset: Asset) => {
     if (asset.type !== 'video' && asset.url) {
       const preload = new Image()
       preload.src = asset.url as string
+      // 解码上限：4K 原图解码可能上百毫秒，不能让双击一直没反应。
+      // 超时就先进影院（内部用缩略图铺底），避免手感发涩。
+      const THEATER_DECODE_WAIT_MS = 300
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, THEATER_DECODE_WAIT_MS)
+      })
+      try {
+        await Promise.race([
+          (preload.decode ? preload.decode() : Promise.resolve()).then(() => {
+            // 标记为已解码：影院挂载时首帧直接显示高清层
+            markImageDecoded(asset.url)
+          }),
+          timeout
+        ])
+      } catch {
+        // 解码失败不阻塞进入影院，退回影院内部的缩略图铺底逻辑
+      } finally {
+        // 清掉计时器：解码先完成时不要让定时器空转到超时
+        if (timeoutId !== undefined) clearTimeout(timeoutId)
+      }
     }
     setTheaterAssetId(asset.id)
   }, [])

@@ -39,6 +39,7 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Asset } from '@/mocks/asset'
+import { isImageDecoded, markImageDecoded } from '@/lib/decodedImages'
 
 interface AssetTheaterViewProps {
   asset: Asset
@@ -90,9 +91,6 @@ function safeString(value: unknown): string {
   return String(value)
 }
 
-/** 已成功解码过的原图 URL。跨挂载保留，用于进入影院时首帧即显示高清层。 */
-const loadedFullImages = new Set<string>()
-
 export function AssetTheaterView({
   asset,
   assets,
@@ -128,7 +126,7 @@ export function AssetTheaterView({
   // 已解码原图的 URL 集合：进入影院时若当前图已在此集合里，
   // 首帧就直接显示高清层，不必先铺缩略图再淡入。
   const [isFullLoaded, setIsFullLoaded] = useState(() =>
-    loadedFullImages.has(asset.url ?? '')
+    isImageDecoded(asset.url)
   )
   /*
    * 双缓冲：影院切换图片时不出现空白帧。
@@ -178,7 +176,7 @@ export function AssetTheaterView({
     probe.src = asset.url as string
     const commit = () => {
       if (cancelled) return
-      if (asset.url) loadedFullImages.add(asset.url)
+      markImageDecoded(asset.url)
       setShownAsset(asset)
       setIsFullLoaded(true)
     }
@@ -684,12 +682,12 @@ export function AssetTheaterView({
                   // 挂载时主动检查 complete，命中就直接切到高清原图。
                   ref={(el) => {
                     if (el && el.complete && el.naturalWidth > 0) {
-                      if (shownAsset.url) loadedFullImages.add(shownAsset.url)
+                      markImageDecoded(shownAsset.url)
                       setIsFullLoaded(true)
                     }
                   }}
                   onLoad={() => {
-                    if (shownAsset.url) loadedFullImages.add(shownAsset.url)
+                    markImageDecoded(shownAsset.url)
                     setIsFullLoaded(true)
                   }}
                   className={cn(
