@@ -2807,11 +2807,12 @@
       },
       "thumbnails": {
         "title": "Thumbnail Cache",
-        "description": "Thumbnails used by the asset library grid and theater mode. They will be regenerated next time you open the asset library.",
-        "clear": "Clear Thumbnail Cache",
+        "description": "Asset library thumbnails, rebuilt automatically",
+        "clear": "Clear",
         "confirmTitle": "Clear thumbnail cache?",
         "confirmDescription": "All thumbnail files will be deleted and their records reset. The library will fall back to original images until thumbnails are rebuilt in the background on your next visit.",
-        "cleared": "Cleared {{count}} thumbnails ({{size}})"
+        "cleared": "Cleared {{count}} thumbnails ({{size}})",
+        "updatedWithScan": "On scan"
       }
     },
     "enableGithubToken": "Enable GitHub API Token",

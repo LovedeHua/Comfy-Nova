@@ -204,9 +204,10 @@ export function CacheManagement() {
   return (
     <div className="space-y-6">
       {/* 缓存统计卡片 */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* items-stretch + Card h-full：同一行的卡片等高，工具栏位置对齐 */}
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
         {stats.caches.map((cache) => (
-          <Card key={cache.type} className="relative overflow-hidden">
+          <Card key={cache.type} className="relative flex h-full flex-col overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <HardDrive className="size-4 text-primary" />
@@ -214,7 +215,7 @@ export function CacheManagement() {
               </CardTitle>
               <p className="text-xs text-muted-foreground">{cache.description}</p>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="flex flex-1 flex-col space-y-3">
               {/* 大小 */}
               <div className="flex items-center gap-2">
                 <HardDrive className="size-4 text-muted-foreground" />
@@ -242,7 +243,8 @@ export function CacheManagement() {
                 <span className="text-sm">{formatTime(cache.last_updated)}</span>
               </div>
 
-              {/* 清理按钮 */}
+              {/* 清理按钮：mt-auto 贴底，卡片等高时与相邻卡片对齐 */}
+              <div className="mt-auto pt-1">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -276,13 +278,14 @@ export function CacheManagement() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              </div>
             </CardContent>
           </Card>
         ))}
 
         {/* 资产库缩略图缓存：不属于通用缓存体系（存在资产数据目录），
             但同样以卡片形式排在网格里，补满一行三列的空位 */}
-        <Card>
+        <Card className="relative flex h-full flex-col overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <ImageIcon className="size-4 text-primary" />
@@ -290,17 +293,31 @@ export function CacheManagement() {
             </CardTitle>
             <p className="text-xs text-muted-foreground">{t('settings.cache.thumbnails.description')}</p>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-1 flex-col space-y-3">
             <div className="flex items-center gap-2">
               <HardDrive className="size-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">{t('settings.cache.size')}:</span>
-              <span className="font-medium">{formatSize(thumbStats?.size_bytes ?? 0)}</span>
+              <span className={cn(
+                'font-medium',
+                (thumbStats?.size_bytes ?? 0) > 100 * 1024 * 1024 && 'text-orange-500',
+                (thumbStats?.size_bytes ?? 0) > 500 * 1024 * 1024 && 'text-red-500'
+              )}>
+                {formatSize(thumbStats?.size_bytes ?? 0)}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <FileText className="size-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">{t('settings.cache.fileCount')}:</span>
               <span className="font-medium">{thumbStats?.file_count ?? 0}</span>
             </div>
+            {/* 与其它缓存卡片对齐：同一位置保留「最后更新」一行。
+                缩略图随资产扫描变更，这里取不到单一时点，统一显示"随扫描更新"。 */}
+            <div className="flex items-center gap-2">
+              <Clock className="size-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">{t('settings.cache.lastUpdated')}:</span>
+              <span className="text-sm">{t('settings.cache.thumbnails.updatedWithScan')}</span>
+            </div>
+            <div className="mt-auto pt-1">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -332,6 +349,7 @@ export function CacheManagement() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            </div>
           </CardContent>
         </Card>
       </div>

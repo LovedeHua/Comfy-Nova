@@ -2910,11 +2910,12 @@
       },
       "thumbnails": {
         "title": "缩略图缓存",
-        "description": "资产库网格与影院模式使用的缩略图。清理后下次进入资产库会自动重建。",
-        "clear": "清理缩略图缓存",
+        "description": "资产库缩略图，清理后自动重建",
+        "clear": "清理",
         "confirmTitle": "确定清理缩略图缓存？",
         "confirmDescription": "将删除全部缩略图文件并重置记录。清理后资产库会回退显示原图，可能短暂变慢；下次进入资产库时后台自动重建缩略图。",
-        "cleared": "已清理 {{count}} 个缩略图（{{size}}）"
+        "cleared": "已清理 {{count}} 个缩略图（{{size}}）",
+        "updatedWithScan": "随扫描更新"
       }
     },
     "enableGithubToken": "启用 GitHub API Token",
