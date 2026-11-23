@@ -492,16 +492,27 @@ export default function AssetLibraryPage() {
     }
   }, [infoPanelPinned, selectedInfoAsset, theaterAsset, location.state, location.pathname, navigate])
 
-  // 点击页面空白区域关闭悬浮 info 面板
+  // 点击页面空白区域：批量模式下退出批量管理（并清空选择）；
+  // 非批量下关闭悬浮 info 面板。
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (theaterAsset) return
+    const target = e.target as HTMLElement
+    // 不视为"空白"：点击在 info 面板内、卡片上、文件夹卡片上、或任何按钮上
+    if (
+      target.closest('[data-info-panel]') ||
+      target.closest('[data-asset-card]') ||
+      target.closest('[data-folder-card]') ||
+      target.closest('button')
+    ) return
+    if (isBatchMode) {
+      setBatchMode(false)
+      clearSelection()
+      return
+    }
     if (!infoPanelPinned && selectedInfoAsset) {
-      const target = e.target as HTMLElement
-      // 不关闭：点击在 info 面板内、卡片上、或对话框上
-      if (target.closest('[data-info-panel]') || target.closest('[data-asset-card]')) return
       setSelectedInfoAsset(null)
     }
-  }, [infoPanelPinned, selectedInfoAsset, theaterAsset])
+  }, [isBatchMode, setBatchMode, clearSelection, infoPanelPinned, selectedInfoAsset, theaterAsset])
 
   return (
     <AssetDragProvider onDrop={handleDropToCategory}>
