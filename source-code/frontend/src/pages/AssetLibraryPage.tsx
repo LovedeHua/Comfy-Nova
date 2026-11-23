@@ -32,6 +32,10 @@ import type { Asset } from '@/mocks/asset'
 import type { AssetMasonryGridRef } from '@/components/asset'
 import type { AssetCategory } from '@/mocks/asset'
 
+// 首次进入资产库才做自动扫描+加载；从其他模块切回时数据仍在 store，
+// 不再重复请求，避免缩略图重新加载造成整屏刷新闪烁。
+let autoInitialized = false
+
 function getCategoryPath(
   categoryId: string,
   categories: AssetCategory[]
@@ -59,7 +63,6 @@ export default function AssetLibraryPage() {
   const location = useLocation()
   const { t } = useTranslation()
   const {
-    loadData,
     getFilteredAssets,
     deleteAssets,
     selectedAssetIds,
@@ -118,9 +121,12 @@ export default function AssetLibraryPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    loadData()
+    // 只在首次进入时自动扫描+加载；之后从其他模块切回直接用 store 里的缓存数据。
+    // 手动刷新（工具栏刷新按钮）不受此标记影响，仍可随时重新扫描。
+    if (autoInitialized) return
+    autoInitialized = true
     incrementalScanLibrary()
-  }, [loadData, incrementalScanLibrary])
+  }, [incrementalScanLibrary])
 
   const filteredAssets = getFilteredAssets()
 
