@@ -467,9 +467,11 @@ export function AssetTheaterView({
   // 格子会被顶出可视区，表现为"缩略图底部显示不全"。
   const STRIP_BORDER = 1
   const STRIP_SCROLLBAR = 8
+  // 滚动容器上下各 py-1（4px），用于给选中环留绘制空间
+  const STRIP_RING_PADDING = 8
   const stripRowInnerHeight = Math.max(
     1,
-    stripBarHeight - STRIP_BORDER - STRIP_SCROLLBAR
+    stripBarHeight - STRIP_BORDER - STRIP_SCROLLBAR - STRIP_RING_PADDING
   )
 
   // 格子边长：行高减去上下 GAP（保持正方形，且与行高同源推导）
@@ -530,17 +532,9 @@ export function AssetTheaterView({
             stripCellData.onNavigate(item)
           }}
           className={cn(
-            // 不裁剪这一层：ring 向外画，overflow-hidden 会把它切掉。
-            // 圆角裁切交给内部 img。
-            'box-border size-full cursor-pointer rounded-md bg-surface-active',
-            'transition-[box-shadow,opacity,transform] duration-150',
-            // 选中态：主色 2px 外环（ring 画在元素外侧，不会被 img 盖住；
-            // 用 ring 而非 border，盒子尺寸恒定，点击不位移）+ 轻微提亮
-            // 选中环 3px 更醒目；未选中态同宽度透明环占位，
-            // 保证两态盒模型完全一致、切换不位移。
-            isActive
-              ? 'ring-[3px] ring-primary brightness-105'
-              : 'ring-[3px] ring-transparent hover:opacity-85 hover:ring-border-strong/70'
+            'relative box-border size-full cursor-pointer rounded-md bg-surface-active',
+            'transition-[opacity] duration-150',
+            isActive ? 'brightness-105' : 'hover:opacity-85'
           )}
         >
           <img
@@ -549,10 +543,19 @@ export function AssetTheaterView({
             loading="lazy"
             decoding="async"
             draggable={false}
-            // object-contain：胶片条格子是正方形，用 cover 会把竖图的上下、
-            // 横图的左右裁掉，看起来"图片显示不全"。contain 保证整图可见，
-            // 空白处由格子底色填充。
-            className="size-full rounded-md bg-black/20 object-contain"
+            // 铺满格子（cover）：胶片条缩略图以"填满"为主的观感更好，
+            // 用户确认采用该方案。选中边框由上层内嵌描边负责，不受裁剪影响。
+            className="size-full rounded-md object-cover"
+          />
+          {/* 选中描边用「绝对定位内嵌边框」：ring/outline 都向外绘制，
+              会被滚动容器的 overflow-x:auto + overflow-y:hidden 裁掉，
+              导致边框上下显示不全。内嵌边框不越界，永不被裁剪，也不占布局。 */}
+          <span
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute inset-0 rounded-md border-[3px] transition-colors duration-150',
+              isActive ? 'border-primary' : 'border-transparent'
+            )}
           />
         </div>
       </div>
@@ -938,7 +941,9 @@ export function AssetTheaterView({
             overscanCount={12}
             cellComponent={StripCell}
             cellProps={stripCellData}
-            className="scrollbar-thin"
+            // py-1 给选中环留出垂直绘制空间：滚动容器是 overflow-x:auto +
+            // overflow-y:hidden，外环会被它裁掉，加内边距后环才有位置画出来。
+            className="scrollbar-thin py-1"
             style={{ overflowY: 'hidden' }}
           />
         )}
