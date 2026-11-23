@@ -9,6 +9,32 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.6.6
+
+> 发布日期：2026-11-23
+
+### 修复
+
+- **Civitai / A1111 图片提取不到提示词**：此前只处理 PNG 的
+  `workflow` / `prompt` 两个 ComfyUI JSON 键，而 Civitai 导出的图片多为
+  JPEG / WebP，参数写在 EXIF UserComment 或 PNG 的 `parameters` 文本块里，
+  格式是 A1111 的纯文本，因此一律提取失败。
+  现按载体分三路读取并统一解析：
+  1. PNG 文本块 `workflow` / `prompt`（ComfyUI，保持原逻辑）
+  2. PNG 文本块 `parameters`（A1111 纯文本）
+  3. JPEG / WebP 的 EXIF UserComment(0x9286)
+  新增 A1111 解析器：拆分正向/反向提示词，解析 Steps / Sampler /
+  CFG scale / Seed / Size / Model 等参数；并正确处理 EXIF 的
+  `UNICODE`/`ASCII` 字符集前缀，不让它残留在提示词里
+
+### 实测
+
+PNG+parameters、JPEG+EXIF(UNICODE)、WebP+EXIF、JPEG+EXIF(ASCII) 四种载体
+提示词/反向词/steps/cfg/seed/size 全部正确；ComfyUI 格式经回归测试无影响。
+新增 7 个单元测试。
+
+---
+
 ## V1.6.5
 
 > 发布日期：2026-11-23

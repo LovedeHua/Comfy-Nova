@@ -4,6 +4,7 @@
 """
 
 import os
+import re
 import uuid
 import hashlib
 import threading
@@ -1001,24 +1002,181 @@ class GalleryScanner:
     def _extract_metadata(self, file_path: Path, asset_type: str) -> dict:
         """提取元数据
 
-        图片读 PNG 的文本块，视频读 MP4 容器的自定义标签——两者格式不同，
-        但内容是同一份 workflow / prompt，解析逻辑共用。
+        按载体分三路读取，解析逻辑统一收敛到 _apply_embedded_payload：
+        1. PNG 文本块：ComfyUI 写 workflow / prompt 两个 JSON
+        2. PNG 文本块 parameters：A1111 / Civitai 的纯文本参数块
+        3. JPEG / WebP 的 EXIF UserComment：Civitai 等站点导出图片的承载方式
+
+        此前只处理 PNG 的 ComfyUI 键，所以 Civitai（WebP/JPEG + A1111 格式）
+        的图片一律提取不到提示词。
         """
-        if asset_type == "image" and file_path.suffix.lower() == ".png":
-            try:
-                from PIL import Image
-                with Image.open(file_path) as img:
-                    info = img.info
-                    workflow = info.get("workflow")
-                    prompt = info.get("prompt")
-            except Exception:
-                return {}
-            return self._apply_embedded_payload({}, workflow, prompt)
+        if asset_type == "image":
+            return self._extract_image_metadata(file_path)
 
         if asset_type == "video":
             return self._extract_video_metadata(file_path)
 
         return {}
+
+    def _extract_image_metadata(self, file_path: Path) -> dict:
+        """读取图片内嵌的生成信息，兼容 ComfyUI 与 A1111/Civitai 两套格式。"""
+        try:
+            from PIL import Image
+            with Image.open(file_path) as img:
+                info = dict(img.info or {})
+                exif_text = self._read_exif_user_comment(img)
+        except Exception as e:
+            logger.debug(f"[GalleryScanner] 读取图片元数据失败 {file_path}: {e}")
+            return {}
+
+        # ComfyUI：workflow / prompt 两个 JSON 文本块
+        metadata = self._apply_embedded_payload(
+            {}, info.get("workflow"), info.get("prompt")
+        )
+        if metadata.get("prompt"):
+            return metadata
+
+        # A1111 / Civitai：纯文本参数块。PNG 存在 info["parameters"]，
+        # JPEG/WebP 存在 EXIF UserComment —— 两处都试，取到哪个用哪个。
+        raw_text = info.get("parameters") or info.get("Parameters") or exif_text
+        if raw_text:
+            metadata.update(self._parse_a1111_parameters(str(raw_text)))
+        return metadata
+
+    def _read_exif_user_comment(self, img) -> Optional[str]:
+        """读取 EXIF UserComment(0x9286)。
+
+        Civitai 等站点导出的 JPEG/WebP 把 A1111 参数块写在这里，并带一段
+        字符集前缀（UNICODE 或 ASCII 后跟若干 NUL），需按前缀判断编码。
+        编码判断错误会抛 UnicodeDecodeError，所以逐段兜底。
+        """
+        try:
+            exif = img.getexif()
+            if not exif:
+                return None
+            raw = exif.get(0x9286)
+            if raw is None:
+                return None
+            # PIL 对 EXIF 文本字段可能直接返回 str，也可能是 bytes；
+            # 统一成 bytes 后走同一套前缀剥离逻辑，避免 str 分支漏处理。
+            data = raw.encode("utf-8", "surrogatepass") if isinstance(raw, str) else bytes(raw)
+
+            # 去掉 EXIF UserComment 的 8 字节字符集标识（UNICODE / ASCII + NUL 填充）
+            for marker in (b"UNICODE", b"ASCII", b"JIS", b"\x00\x00\x00\x00"):
+                if data.startswith(marker):
+                    data = data[8:] if len(data) > 8 else b""
+                    break
+
+            if not data.strip(b"\x00 \r\n\t"):
+                return None
+
+            # 带 UNICODE 标识的通常是 UTF-16BE；其余按 UTF-8 → UTF-16BE → latin-1 兜底
+            for encoding in ("utf-8", "utf-16-be", "latin-1"):
+                try:
+                    text = data.decode(encoding)
+                except UnicodeDecodeError:
+                    continue
+                cleaned = text.strip("\x00").strip()
+                # 过滤解码出来的乱码（控制字符占比高说明编码猜错）
+                if cleaned and not any(ord(ch) < 0x09 for ch in cleaned[:20]):
+                    return cleaned
+        except Exception as e:
+            logger.debug(f"[GalleryScanner] 解析 EXIF UserComment 失败: {e}")
+        return None
+
+    def _parse_a1111_parameters(self, text: str) -> dict:
+        """解析 A1111 / Civitai 的 parameters 文本块，返回资产元数据字段。
+
+        格式：首段是正向提示词，可选一段 Negative prompt: 开头的是反向，
+        末行是 Key: value, Key: value 形式的生成参数。
+
+        参数行里值本身可能含逗号，所以按 Key: 模式切分而不是简单 split 逗号。
+        """
+        metadata: dict = {}
+        if not text.strip():
+            return metadata
+
+        lines = text.strip().split("\n")
+        params_line = ""
+        prompt_lines: list[str] = []
+        negative_lines: list[str] = []
+        current = prompt_lines
+        found_negative = False
+
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("Negative prompt:"):
+                found_negative = True
+                current = negative_lines
+                remainder = stripped[len("Negative prompt:"):].strip()
+                if remainder:
+                    current.append(remainder)
+                continue
+            # 末行且形如 Key: value → 参数行
+            if index == len(lines) - 1 and re.match(r"^[A-Za-z][\w ]*:\s", stripped):
+                params_line = stripped
+                continue
+            current.append(stripped)
+
+        prompt = ", ".join(prompt_lines).strip()
+        if prompt:
+            metadata["prompt"] = prompt
+        negative = ", ".join(negative_lines).strip()
+        if negative:
+            metadata["negative_prompt"] = negative
+        if found_negative:
+            metadata["has_negative_prompt"] = True
+
+        if params_line:
+            metadata.update(self._parse_a1111_params_line(params_line))
+        return metadata
+
+    def _parse_a1111_params_line(self, line: str) -> dict:
+        """把 Steps: 28, Sampler: X, CFG scale: 7, Seed: 123 拆成字典字段。"""
+        params: dict = {}
+        # 以逗号 + Key: 为界切分；Key 允许空格（CFG scale / Model hash）
+        pattern = re.compile(r",\s*(?=[A-Za-z][\w ]{0,24}:\s)")
+        segments = pattern.split(line)
+        for segment in segments:
+            key, sep, value = segment.partition(":")
+            if not sep:
+                continue
+            key = key.strip().lower()
+            value = value.strip()
+            if key == "steps":
+                params["steps"] = self._safe_int(value)
+            elif key == "sampler":
+                params["sampler"] = value
+            elif key == "cfg scale":
+                params["cfg"] = self._safe_float(value)
+            elif key == "seed":
+                params["seed"] = self._safe_int(value)
+            elif key == "model":
+                params["model"] = value
+            elif key == "model hash":
+                params["model_hash"] = value
+            elif key == "size":
+                match = re.match(r"^(\d+)x(\d+)$", value)
+                if match:
+                    params["width"] = int(match.group(1))
+                    params["height"] = int(match.group(2))
+        return {k: v for k, v in params.items() if v is not None}
+
+    @staticmethod
+    def _safe_int(value: str) -> Optional[int]:
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _safe_float(value: str) -> Optional[float]:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
 
     def _extract_video_metadata(self, file_path: Path) -> dict:
         """从视频容器读取内嵌的 workflow / prompt
