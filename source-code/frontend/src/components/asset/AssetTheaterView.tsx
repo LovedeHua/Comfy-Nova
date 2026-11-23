@@ -146,10 +146,18 @@ export function AssetTheaterView({
   } = useImageZoomPan({ onScaleChange: setScaleLabel })
 
 
-  useEffect(() => {
+  // 切换资产时在渲染期同步重置加载态：
+  // 不能放在 effect 里——原图 ref 的缓存检查（commit 阶段）会先于 effect 执行，
+  // 若 effect 再设 false 就会把已命中的缓存图重新藏回缩略图，产生闪烁。
+  // 渲染期 setState 是 React 允许的同步重置模式（同一组件内、commit 前收敛）。
+  const lastAssetIdRef = useRef(asset.id)
+  if (lastAssetIdRef.current !== asset.id) {
+    lastAssetIdRef.current = asset.id
     setIsFullLoaded(false)
-    // 切换资产时必须回到适应窗口，否则会沿用上一张的缩放与位移，
-    // 看起来像"新图被放大到了奇怪的位置"。
+  }
+
+  useEffect(() => {
+    // 切换资产时必须回到适应窗口，否则会沿用上一张的缩放与位移
     resetZoom()
   }, [asset.id, resetZoom])
 
@@ -634,6 +642,12 @@ export function AssetTheaterView({
                   alt={asset.filename}
                   draggable={false}
                   decoding="async"
+                  // 缓存竞态：原图已在浏览器缓存时 onLoad 可能不再触发，
+                  // 会导致一直停在模糊缩略图上（看起来像"闪一下后没切换"）。
+                  // 挂载时主动检查 complete，命中就直接切到高清原图。
+                  ref={(el) => {
+                    if (el && el.complete && el.naturalWidth > 0) setIsFullLoaded(true)
+                  }}
                   onLoad={() => setIsFullLoaded(true)}
                   className={cn(
                     'absolute inset-0 size-full select-none rounded-lg object-contain transition-opacity duration-150',

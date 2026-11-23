@@ -464,6 +464,12 @@ export default function AssetLibraryPage() {
   }, [isBatchMode])
 
   const handleOpenTheater = useCallback((asset: Asset) => {
+    // 进入影院前先预取当前原图：组件挂载时图片已在浏览器缓存，
+    // ref 的 complete 检查会直接切到高清层，消除"缩略图闪一下"的过渡。
+    if (asset.type !== 'video' && asset.url) {
+      const preload = new Image()
+      preload.src = asset.url as string
+    }
     setTheaterAssetId(asset.id)
   }, [])
 

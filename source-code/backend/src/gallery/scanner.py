@@ -21,11 +21,11 @@ SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".webm"}
 SUPPORTED_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS | SUPPORTED_VIDEO_EXTENSIONS
 
-# 缩略图最长边。网格卡片实际显示宽度约 250 px，影院胶片条约 60 px；
-# 256 在 2x DPI 下对 250px 卡片仍清晰，而解码 bitmap 从 512² 的约 1MB
-# 降到 256² 的约 256KB —— 这是 renderer 内存的主要来源，收益 4 倍。
-THUMBNAIL_MAX_SIZE = 256
-# 文件名里的尺寸标记：用于识别旧版 512 缩略图并触发重建
+# 缩略图最长边。256 虽省内存（bitmap 仅 1/4），但用户实测偏模糊，
+# 视觉优先改回 512：单张解码约 0.75MB，换来清晰的网格卡片与影院预览。
+# 文件名带尺寸标记，改尺寸后 backfill 会把旧尺寸缩略图自动重建，双向平滑迁移。
+THUMBNAIL_MAX_SIZE = 512
+# 文件名里的尺寸标记：用于识别旧尺寸缩略图并触发重建
 THUMBNAIL_TAG = f"s{THUMBNAIL_MAX_SIZE}"
 # webp 质量：80 在缩略图尺度上看不出劣化，体积约为 90 的 60%。
 THUMBNAIL_QUALITY = 80
@@ -674,7 +674,7 @@ class GalleryScanner:
             for asset in gallery_storage.get_assets():
                 if asset.asset_type != "image":
                     continue
-                # 已有缩略图但不含当前尺寸标记 → 旧版大图（512），重建为 256
+                # 已有缩略图但不含当前尺寸标记 → 旧尺寸图，重建为当前尺寸
                 if asset.thumbnail_path:
                     if f"_{THUMBNAIL_TAG}.webp" in asset.thumbnail_path:
                         continue
@@ -735,7 +735,7 @@ class GalleryScanner:
                 img.thumbnail((THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE), Image.Resampling.LANCZOS)
 
                 # 文件名带尺寸标记：旧版 512 缩略图（无标记或 s512）会被
-                # backfill 识别并重建为 256，实现平滑迁移、无需用户手动清缓存。
+                # backfill 识别旧尺寸并重建，实现平滑迁移、无需用户手动清缓存。
                 thumbnail_filename = (
                     f"{file_path.stem}_{hashlib.md5(str(file_path).encode()).hexdigest()[:8]}_{THUMBNAIL_TAG}.webp"
                 )
