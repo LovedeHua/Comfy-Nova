@@ -79,6 +79,8 @@ interface AssetStore {
   assets: Asset[]
   categories: AssetCategory[]
   settings: GallerySettings | null
+  /** 当前资产来源：generated=生成图库，input=输入图库 */
+  assetSource: 'generated' | 'input'
   selectedCategoryId: string
   selectedAssetIds: string[]
   searchQuery: string
@@ -111,6 +113,8 @@ interface AssetStore {
   getScanStatus: () => Promise<{ success: boolean; scanning?: boolean; stopping?: boolean; progress?: ScanProgress | null }>
   stopScan: () => Promise<boolean>
   pollScanProgress: () => void
+  /** 切换资产来源标签页（生成图/输入图），选中分类复位避免跨库串数据 */
+  setAssetSource: (source: 'generated' | 'input') => void
   setSelectedCategoryId: (id: string) => void
   setSearchQuery: (query: string) => void
   toggleTypeFilter: (type: Asset['type']) => void
@@ -136,7 +140,7 @@ interface AssetStore {
   importAssets: (paths: string[]) => Promise<{ success: boolean; importedCount?: number }>
   moveToCategory: (ids: string[], categoryId: string | null) => Promise<boolean>
   getSettings: () => Promise<GallerySettings | null>
-  saveSettings: (libraryPath: string) => Promise<boolean>
+  saveSettings: (libraryPath: string, inputLibraryPath?: string) => Promise<boolean>
   getWorkflow: (id: string) => Promise<{ success: boolean; workflow?: object }>
   exportWorkflow: (id: string) => Promise<{ success: boolean; workflowPath?: string; workflowName?: string; error_message?: string }>
   exportWorkflowToPath: (id: string, savePath: string) => Promise<{ success: boolean; workflowPath?: string; error_message?: string }>
@@ -278,6 +282,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   thumbnailSize: Number(localStorage.getItem('thumbnailSize')) || 250,
   showFoldersInList: localStorage.getItem('asset-show-folders-in-list') === 'true',
   viewMode: localStorage.getItem('asset-view-mode') === 'grid' ? 'grid' : 'masonry',
+  // 当前管理的资产来源：generated=生成图库，input=输入图库（两库数据完全隔离）
+  assetSource: 'generated' as 'generated' | 'input',
 
   loadData: async () => {
     console.log('[useAssetStore] 加载数据开始')
@@ -294,7 +300,7 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         set({
           assets: mockAssets,
           categories: mockAssetCategories,
-          settings: { libraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true },
+          settings: { libraryPath: '', inputLibraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true },
           isLoading: false
         })
         return
@@ -337,6 +343,7 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
           categories: result.categories || [],
           settings: {
             libraryPath: result.settings?.libraryPath || '',
+            inputLibraryPath: result.settings?.inputLibraryPath || '',
             lastScanTime: result.settings?.lastScanTime || null,
             nsfwAutoClassify: result.settings?.nsfwAutoClassify ?? false,
             nsfwThreshold: result.settings?.nsfwThreshold ?? 0.6,
@@ -596,6 +603,11 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     poll()
   },
 
+  setAssetSource: (source) => {
+    if (get().assetSource === source) return
+    set({ assetSource: source, selectedCategoryId: 'all' })
+  },
+
   setSelectedCategoryId: (id) => set({ selectedCategoryId: id }),
 
   setSearchQuery: (query) => set({ searchQuery: query }),
@@ -821,7 +833,7 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   getSettings: async () => {
     try {
       if (isDevelopment()) {
-        const defaultSettings = { libraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true }
+        const defaultSettings = { libraryPath: '', inputLibraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true }
         return defaultSettings
       }
 
@@ -831,7 +843,7 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         return result.settings
       }
 
-      const defaultSettings = { libraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true }
+      const defaultSettings = { libraryPath: '', inputLibraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true }
       set({ settings: defaultSettings })
       return defaultSettings
     } catch (error) {
@@ -840,20 +852,21 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     }
   },
 
-  saveSettings: async (libraryPath) => {
+  saveSettings: async (libraryPath, inputLibraryPath) => {
     console.log('[useAssetStore] 保存设置:', libraryPath)
 
     try {
       if (isDevelopment()) {
-        set({ settings: { libraryPath, lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true } })
+        set({ settings: { libraryPath, inputLibraryPath: inputLibraryPath ?? '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true } })
         return true
       }
 
-      const result = await window.pywebview.api.gallery_save_settings(libraryPath)
+      const result = await window.pywebview.api.gallery_save_settings(libraryPath, inputLibraryPath)
       if (result.success) {
         const currentSettings = get().settings
         set({ settings: { 
           libraryPath, 
+          inputLibraryPath: inputLibraryPath ?? currentSettings?.inputLibraryPath ?? '',
           lastScanTime: currentSettings?.lastScanTime || null,
           nsfwAutoClassify: currentSettings?.nsfwAutoClassify || false,
           nsfwThreshold: currentSettings?.nsfwThreshold || 0.6,
@@ -1170,6 +1183,7 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     // 不缓存就是每帧 O(N log N) 重排 + 新建数组。
     const cacheKey = [
       state.assets,
+      state.assetSource,
       state.searchQuery,
       state.selectedCategoryId,
       state.showFoldersInList,
@@ -1187,6 +1201,9 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     }
 
     let filtered = state.assets
+
+    // 来源隔离：生成图库与输入图库互不可见
+    filtered = filtered.filter((a) => (a.source ?? 'generated') === state.assetSource)
 
     if (state.searchQuery) {
       const query = state.searchQuery.toLowerCase()

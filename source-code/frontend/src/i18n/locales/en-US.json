@@ -4063,7 +4063,10 @@
       "browseError": "Failed to browse folder",
       "pathRequired": "Please select a library path",
       "saveSuccess": "Settings saved",
-      "saveError": "Failed to save settings"
+      "saveError": "Failed to save settings",
+      "inputLibraryPath": "Input Images Path",
+      "inputPathPlaceholder": "e.g. E:\\ComfyUI\\input",
+      "inputPathHint": "Manage input assets (reference images, etc.) separately from the generated library"
     },
     "thumbnailSizeValue": "{size}px",
     "noAssets": "No assets",
@@ -4223,6 +4226,10 @@
       "workspaceNotStarted": "Workspace not started, please click 'Open Workspace' on the workspace page first",
       "success": "Image pushed to ComfyUI",
       "failed": "Push failed, please try again"
+    },
+    "sourceTab": {
+      "generated": "Generated",
+      "input": "Input"
     }
   },
   "dataSetup": {

@@ -41,6 +41,7 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
     cancelNsfwScan
   } = useAssetStore()
   const [libraryPath, setLibraryPath] = useState('')
+  const [inputLibraryPath, setInputLibraryPath] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   
@@ -71,6 +72,9 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
         if (settingsResult?.libraryPath !== undefined) {
           setLibraryPath(settingsResult.libraryPath)
         }
+        if (settingsResult?.inputLibraryPath !== undefined) {
+          setInputLibraryPath(settingsResult.inputLibraryPath)
+        }
       }).finally(() => setLoading(false))
     }
   }, [open, getSettings, getNsfwStatus])
@@ -100,6 +104,24 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
     }
   }
 
+  const handleBrowseInput = async () => {
+    try {
+      if (isDevelopment()) {
+        setInputLibraryPath('C:\\Users\\Example\\Documents\\ComfyUI\\input')
+      } else {
+        const response = await window.pywebview.api.browse_folder_for_shortcut()
+        if (response.success && response.path) {
+          setInputLibraryPath(response.path)
+        } else if (response.error_message) {
+          showToast(response.error_message, 'error')
+        }
+      }
+    } catch (error) {
+      console.error('[AssetSettingsDialog] 浏览输入库文件夹失败:', error)
+      showToast(t('asset.settingsDialog.browseError'), 'error')
+    }
+  }
+
   const handleSave = async () => {
     if (!libraryPath.trim()) {
       showToast(t('asset.settingsDialog.pathRequired'), 'warning')
@@ -109,14 +131,18 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
     setSaving(true)
     try {
       console.log('[AssetSettingsDialog] 保存设置:', libraryPath.trim())
-      const success = await saveSettings(libraryPath.trim())
+      const success = await saveSettings(libraryPath.trim(), inputLibraryPath.trim())
       console.log('[AssetSettingsDialog] 保存结果:', success)
-      
+
       if (success) {
         showToast(t('asset.settingsDialog.saveSuccess'), 'success')
         onOpenChange(false)
         console.log('[AssetSettingsDialog] 启动后台扫描...')
         startBackgroundScan(libraryPath.trim())
+        // 输入库路径已配置时同步扫描（与生成图库分开管理）
+        if (inputLibraryPath.trim()) {
+          window.pywebview?.api?.gallery_scan_input?.(inputLibraryPath.trim())
+        }
       } else {
         showToast(t('asset.settingsDialog.saveError'), 'error')
       }
@@ -228,6 +254,28 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
               </div>
               <p className="text-xs text-muted-foreground">
                 {t('asset.settingsDialog.pathHint')}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {t('asset.settingsDialog.inputLibraryPath')}
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  value={inputLibraryPath}
+                  onChange={(e) => setInputLibraryPath(e.target.value)}
+                  placeholder={t('asset.settingsDialog.inputPathPlaceholder')}
+                  className="flex-1"
+                  disabled={loading}
+                />
+                <Button variant="outline" onClick={handleBrowseInput} disabled={loading}>
+                  <FolderOpen className="mr-1 size-4" />
+                  {t('asset.settingsDialog.browse')}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t('asset.settingsDialog.inputPathHint')}
               </p>
             </div>
 

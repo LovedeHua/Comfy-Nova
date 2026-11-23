@@ -223,12 +223,17 @@ class GalleryController:
             logger.error(f"[GalleryController] 获取设置失败: {e}")
             return {"success": False, "error_message": str(e)}
 
-    def gallery_save_settings(self, library_path: str = None) -> dict:
+    def gallery_save_settings(
+        self,
+        library_path: str = None,
+        input_library_path: str = None,
+    ) -> dict:
         """
         保存设置
 
         Args:
-            library_path: 资产库路径
+            library_path: 资产库路径（生成图库）
+            input_library_path: 输入图片库路径（与生成图库分开管理）
 
         Returns:
             {
@@ -236,10 +241,44 @@ class GalleryController:
             }
         """
         try:
-            gallery_storage.update_settings(library_path=library_path)
+            gallery_storage.update_settings(
+                library_path=library_path,
+                input_library_path=input_library_path,
+            )
             return {"success": True}
         except Exception as e:
             logger.error(f"[GalleryController] 保存设置失败: {e}")
+            return {"success": False, "error_message": str(e)}
+
+    def gallery_scan_input(self, input_library_path: str = None) -> dict:
+        """
+        全量扫描输入图片库（与生成图库完全隔离）
+
+        Args:
+            input_library_path: 输入图片库目录路径（可选，不传则使用已配置路径）
+
+        Returns:
+            {
+                "success": bool,
+                "added": int,
+                "updated": int,
+                "removed": int,
+                "errors": list[str]
+            }
+        """
+        try:
+            if input_library_path is None:
+                settings = gallery_storage.get_settings()
+                input_library_path = settings.input_library_path
+
+            if not input_library_path:
+                return {"success": False, "error_message": "未配置输入图片库路径"}
+
+            result = gallery_scanner.scan_input_library(input_library_path)
+            result["success"] = True
+            return result
+        except Exception as e:
+            logger.error(f"[GalleryController] 输入库扫描失败: {e}")
             return {"success": False, "error_message": str(e)}
 
     def gallery_scan(self, library_path: str = None) -> dict:

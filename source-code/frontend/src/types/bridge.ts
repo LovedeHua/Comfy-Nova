@@ -1673,6 +1673,7 @@ export interface PyWebViewAPI {
     }>
     settings?: {
       libraryPath: string
+      inputLibraryPath: string
       lastScanTime: string | null
       nsfwAutoClassify: boolean
       nsfwThreshold: number
@@ -1735,6 +1736,7 @@ export interface PyWebViewAPI {
     success: boolean
     settings?: {
       libraryPath: string
+      inputLibraryPath: string
       lastScanTime: string | null
       nsfwAutoClassify: boolean
       nsfwThreshold: number
@@ -1743,12 +1745,21 @@ export interface PyWebViewAPI {
     error_message?: string
   }>;
 
-  gallery_save_settings: (libraryPath?: string) => Promise<{
+  gallery_save_settings: (libraryPath?: string, inputLibraryPath?: string) => Promise<{
     success: boolean
     error_message?: string
   }>;
 
   gallery_scan: (libraryPath?: string) => Promise<{
+    success: boolean
+    added?: number
+    updated?: number
+    removed?: number
+    errors?: string[]
+    error_message?: string
+  }>;
+
+  gallery_scan_input: (inputLibraryPath?: string) => Promise<{
     success: boolean
     added?: number
     updated?: number

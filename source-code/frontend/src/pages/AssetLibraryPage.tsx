@@ -81,7 +81,9 @@ export default function AssetLibraryPage() {
     deleteCategory,
     openLocation,
     incrementalScanLibrary,
-    viewMode
+    viewMode,
+    assetSource,
+    setAssetSource
   } = useAssetStore()
 
   // 影院模式：只记 id，资产数据始终从 store 派生，改名/评分才能实时反映在舞台上
@@ -538,6 +540,34 @@ export default function AssetLibraryPage() {
           />
         )}
 
+
+        {/* 资产来源切换：生成图库 / 输入图库，两库数据、分类、扫描路径完全隔离 */}
+        {!theaterAsset && (
+          <div className="flex shrink-0 items-center gap-1 border-b border-border-subtle bg-surface px-3 py-1.5">
+            <button
+              onClick={() => setAssetSource('generated')}
+              className={cn(
+                'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                assetSource === 'generated'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+              )}
+            >
+              {t('asset.sourceTab.generated')}
+            </button>
+            <button
+              onClick={() => setAssetSource('input')}
+              className={cn(
+                'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                assetSource === 'input'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+              )}
+            >
+              {t('asset.sourceTab.input')}
+            </button>
+          </div>
+        )}
 
         {/* 横向用 clip、纵向用 hidden：clip 不产生滚动容器，轨道列表定位时的滚动才不会顺带把
             整行（含分类树）推出可视区；纵向仍需 hidden 保证这一层按可用高度收缩，不被内容撑高 */}

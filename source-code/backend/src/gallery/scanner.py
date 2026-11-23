@@ -173,8 +173,9 @@ class GalleryScanner:
 
         self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
 
-        # 清理旧数据（切换目录时需要清理之前的资产和分类）
-        gallery_storage.clear_all_data()
+        # 清理旧数据（切换目录时需要清理之前的资产和分类）。
+        # 只清生成图（source=generated），输入图（source=input）是独立库，不能被波及
+        gallery_storage.clear_generated_data()
 
         self._sync_categories_from_folders(library_dir)
 
@@ -390,6 +391,86 @@ class GalleryScanner:
         }
 
         return result
+
+
+    def scan_input_library(self, input_library_path: str, progress_callback=None) -> dict:
+        """全量扫描输入图片库（source=input），与生成图库完全隔离。
+
+        - 只清 source=input 的资产，生成图与生成库分类不受影响
+        - 输入库不建文件夹分类（保持"全部/收藏/未分类"简单结构）
+        - 缩略图写入 thumbnails/input/ 子目录，避免与生成图混淆
+        """
+        self._cancelled = False
+        library_dir = Path(input_library_path)
+
+        if not library_dir.exists():
+            return {"added": 0, "updated": 0, "removed": 0, "errors": ["目录不存在"]}
+
+        input_thumbs = self._thumbnails_dir / "input"
+        input_thumbs.mkdir(parents=True, exist_ok=True)
+
+        gallery_storage.clear_input_data()
+
+        existing_assets = {a.file_path: a for a in gallery_storage.get_assets() if a.source == "input"}
+        found_files = {}
+        errors = []
+        added_count = 0
+        updated_count = 0
+        removed_count = 0
+
+        all_files = list(self._find_media_files(library_dir))
+        total_files = len(all_files)
+
+        for index, file_path in enumerate(all_files):
+            if self._cancelled:
+                errors.append("扫描已取消")
+                break
+
+            try:
+                relative = str(file_path.relative_to(library_dir)).replace("\\", "/")
+                found_files[relative] = file_path
+
+                stat = file_path.stat()
+                existing = existing_assets.get(str(file_path))
+                if existing is not None:
+                    if existing.size == stat.st_size and existing.thumbnail_path:
+                        found_files[relative] = existing
+                        continue
+                    self._update_asset(existing, file_path)
+                    existing.source = "input"
+                    updated_count += 1
+                else:
+                    asset = self._create_asset(file_path, category_id=None, source="input")
+                    if asset is not None:
+                        gallery_storage.add_asset(asset)
+                        added_count += 1
+
+                if progress_callback:
+                    progress_callback(index + 1, total_files, file_path.name)
+            except Exception as exc:
+                errors.append(f"{file_path.name}: {exc}")
+
+        # 删除磁盘上已不存在的输入图记录
+        for existing in existing_assets.values():
+            if existing.source != "input":
+                continue
+            rel = str(Path(existing.file_path).relative_to(library_dir)).replace("\\", "/")
+            if rel not in found_files:
+                gallery_storage.delete_asset(existing.id)
+                removed_count += 1
+
+        gallery_storage.update_settings(last_scan_time=datetime.now().isoformat())
+
+        if added_count > 0 or updated_count > 0:
+            self._thumbnails_backfilled = False
+            self.start_thumbnail_backfill()
+
+        return {
+            "added": added_count,
+            "updated": updated_count,
+            "removed": removed_count,
+            "errors": errors
+        }
 
     def _sync_categories_from_folders(self, library_dir: Path):
         """
@@ -631,7 +712,12 @@ class GalleryScanner:
             logger.warning(f"[GalleryScanner] 生成图片缩略图失败 {file_path}: {e}")
             return None
 
-    def _create_asset(self, file_path: Path, category_id: Optional[str] = None) -> Optional[Asset]:
+    def _create_asset(
+        self,
+        file_path: Path,
+        category_id: Optional[str] = None,
+        source: str = "generated",
+    ) -> Optional[Asset]:
         """创建资产对象"""
         try:
             stat = file_path.stat()
@@ -675,6 +761,7 @@ class GalleryScanner:
                 filename=file_path.name,
                 file_path=str(file_path),
                 asset_type=asset_type,
+                source=source,
                 width=width,
                 height=height,
                 size=stat.st_size,

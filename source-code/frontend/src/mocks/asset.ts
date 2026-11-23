@@ -32,6 +32,8 @@ export interface Asset {
   description?: string
   previewBlurred?: boolean
   rating?: number
+  /** 资产来源：generated=生成图（output 库），input=输入图（input 库） */
+  source?: 'generated' | 'input'
   /** 缩略图 URL（前端计算：thumbnailPath 或 filePath） */
   thumbnail?: string
   /** 原图 URL（前端计算：filePath） */
@@ -50,6 +52,8 @@ export interface AssetCategory {
 
 export interface GallerySettings {
   libraryPath: string
+  /** 输入图片库路径（与生成图库分开管理） */
+  inputLibraryPath: string
   lastScanTime: string | null
   nsfwAutoClassify: boolean
   nsfwThreshold: number

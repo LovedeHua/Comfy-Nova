@@ -4654,7 +4654,10 @@
       "nsfwAutoBlurHint": "开启后 NSFW 图片默认模糊显示",
       "nsfwAutoBlurEnabled": "NSFW 自动模糊已开启",
       "nsfwAutoBlurDisabled": "NSFW 自动模糊已关闭",
-      "nsfwAutoBlurToggleError": "设置 NSFW 自动模糊失败"
+      "nsfwAutoBlurToggleError": "设置 NSFW 自动模糊失败",
+      "inputLibraryPath": "输入图片路径",
+      "inputPathPlaceholder": "例如 E:\\ComfyUI\\input",
+      "inputPathHint": "输入图片库路径用于管理导入的参考图等输入素材，与生成图库分开管理"
     },
     "thumbnailSizeValue": "{size}px",
     "noAssets": "暂无资源",
@@ -4821,6 +4824,10 @@
       "workspaceNotStarted": "工作台未启动，请先在工作台页面点击「打开工作台」",
       "success": "图片已推送到 ComfyUI",
       "failed": "推送失败，请重试"
+    },
+    "sourceTab": {
+      "generated": "生成图",
+      "input": "输入图"
     }
   },
   "dataSetup": {

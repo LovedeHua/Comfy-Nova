@@ -142,11 +142,18 @@ class GalleryStorage:
         data = self.load()
         return data.settings
 
-    def update_settings(self, library_path: Optional[str] = None, last_scan_time: Optional[str] = None) -> bool:
+    def update_settings(
+        self,
+        library_path: Optional[str] = None,
+        last_scan_time: Optional[str] = None,
+        input_library_path: Optional[str] = None,
+    ) -> bool:
         """更新设置"""
         data = self.load()
         if library_path is not None:
             data.settings.library_path = library_path
+        if input_library_path is not None:
+            data.settings.input_library_path = input_library_path
         if last_scan_time is not None:
             data.settings.last_scan_time = last_scan_time
         else:
@@ -175,6 +182,22 @@ class GalleryStorage:
         data.assets = []
         data.categories = [c for c in data.categories if c.is_system]
         # logger.info("[GalleryStorage] 已清空资产和分类数据")
+        return self.save()
+
+    def clear_generated_data(self) -> bool:
+        """清空生成图资产（source=generated）与其文件夹分类，输入图库不受影响。"""
+        data = self.load()
+        data.assets = [a for a in data.assets if a.source != "generated"]
+        data.categories = [c for c in data.categories if c.is_system]
+        return self.save()
+
+    def clear_input_data(self) -> bool:
+        """清空输入图资产（source=input），生成图库数据不受影响。
+
+        输入库不使用文件夹分类，无需清理分类。
+        """
+        data = self.load()
+        data.assets = [a for a in data.assets if a.source != "input"]
         return self.save()
 
     def update_asset_nsfw(

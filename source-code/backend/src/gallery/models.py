@@ -71,6 +71,8 @@ class Asset:
     description: Optional[str] = None
     preview_blurred: bool = False
     rating: int = 0
+    # 资产来源：generated=生成图（output 库），input=输入图（input 库）
+    source: str = "generated"
 
     def to_dict(self) -> dict:
         result = {
@@ -78,6 +80,7 @@ class Asset:
             "filename": self.filename,
             "filePath": self.file_path,
             "type": self.asset_type,
+            "source": self.source,
             "width": self.width,
             "height": self.height,
             "size": self.size,
@@ -148,6 +151,7 @@ class Asset:
             "hasWorkflow": self.has_workflow,
             "previewBlurred": self.preview_blurred,
             "rating": self.rating,
+            "source": self.source,
         }
         # 可选字段只在有值时下发：无生成参数的资产（如手动放进去的图）
         # 若把这些键都塞 null，列表反而比 to_dict() 更大。
@@ -209,6 +213,7 @@ class Asset:
             tags=data.get("tags", []),
             description=data.get("description"),
             preview_blurred=data.get("previewBlurred", False),
+            source=data.get("source", "generated"),
             rating=data.get("rating", 0)
         )
 
@@ -238,6 +243,8 @@ class ScanProgress:
 class GallerySettings:
     """资产库设置"""
     library_path: str = ""
+    # 输入图片库路径（与生成图库分开管理、分开扫描、分开存储）
+    input_library_path: str = ""
     last_scan_time: Optional[str] = None
     nsfw_auto_classify: bool = False
     nsfw_threshold: float = 0.6
@@ -246,6 +253,7 @@ class GallerySettings:
     def to_dict(self) -> dict:
         return {
             "libraryPath": self.library_path,
+            "inputLibraryPath": self.input_library_path,
             "lastScanTime": self.last_scan_time,
             "nsfwAutoClassify": self.nsfw_auto_classify,
             "nsfwThreshold": self.nsfw_threshold,
@@ -256,6 +264,7 @@ class GallerySettings:
     def from_dict(cls, data: dict) -> "GallerySettings":
         return cls(
             library_path=data.get("libraryPath", ""),
+            input_library_path=data.get("inputLibraryPath", ""),
             last_scan_time=data.get("lastScanTime"),
             nsfw_auto_classify=data.get("nsfwAutoClassify", False),
             nsfw_threshold=data.get("nsfwThreshold", 0.6),
