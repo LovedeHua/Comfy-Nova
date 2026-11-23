@@ -26,9 +26,17 @@ interface WorkflowGraphProps {
   data: WorkflowJsonData
   selectedPluginId?: string | null
   className?: string
+  /**
+   * 是否显示右下角缩略图导航。
+   *
+   * 默认关闭：调用方（详情面板预览）画布仅 220px 高，而 MiniMap 默认
+   * 200×150，会遮住近 70% 的图；且 fitView 下整图本就在视野内，
+   * MiniMap 的遮罩几乎全覆盖，看起来像空白。需要全局导航时再显式开启。
+   */
+  showMiniMap?: boolean
 }
 
-export function WorkflowGraph({ data, selectedPluginId, className }: WorkflowGraphProps) {
+export function WorkflowGraph({ data, selectedPluginId, className, showMiniMap = false }: WorkflowGraphProps) {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => convertToReactFlow(data),
     [data]
@@ -75,7 +83,7 @@ export function WorkflowGraph({ data, selectedPluginId, className }: WorkflowGra
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.25 }}
         minZoom={0.1}
         maxZoom={2}
         defaultEdgeOptions={{
@@ -85,12 +93,17 @@ export function WorkflowGraph({ data, selectedPluginId, className }: WorkflowGra
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={'dots' as BackgroundVariant} gap={20} size={1} color="hsl(var(--border-subtle))" />
-        <Controls className="!bg-surface !border-border-subtle" />
-        <MiniMap
-          nodeColor={nodeColor}
-          className="!bg-surface !border-border-subtle"
-          maskColor="hsl(var(--background)/0.8)"
+        <Controls
+          className="!bg-surface !border-border-subtle [&>button]:!size-7 [&>button]:!border-border-subtle"
+          showInteractive={false}
         />
+        {showMiniMap && (
+          <MiniMap
+            nodeColor={nodeColor}
+            className="!bg-surface !border-border-subtle"
+            maskColor="hsl(var(--background)/0.8)"
+          />
+        )}
       </ReactFlow>
     </div>
   )

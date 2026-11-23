@@ -384,7 +384,7 @@ export function AssetCategoryTree({
             setMenu({ x: e.clientX, y: e.clientY, category })
           }}
           className={cn(
-            'group relative flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
+            'group relative flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors',
             'border border-transparent',
             isSelected
               ? 'bg-primary/10 text-primary font-medium'
@@ -439,9 +439,10 @@ export function AssetCategoryTree({
   return (
     <ResizableSidebar storageKey="asset-category-tree" className={className}>
       {header && (
-        <div className="shrink-0 px-3 pb-2 pt-3">{header}</div>
+        <div className="shrink-0 px-3 pb-1 pt-3">{header}</div>
       )}
-      <div className="shrink-0 px-3 pb-1 pt-3">
+      {/* 有 header 时不再加 pt，避免两层上边距叠加成大片空白 */}
+      <div className={cn('shrink-0 px-3 pb-1', header ? 'pt-1' : 'pt-3')}>
         {isCreatingRoot ? (
           renderCreateInput(0)
         ) : (
@@ -457,7 +458,7 @@ export function AssetCategoryTree({
         )}
       </div>
 
-      <ScrollArea className="min-h-0 flex-1 px-3 pb-3">
+      <ScrollArea className="min-h-0 flex-1 px-2.5 pb-3 pt-0.5">
         <div className="flex flex-col gap-0.5">
           <div
             data-category-id="all"
@@ -470,7 +471,7 @@ export function AssetCategoryTree({
             }}
             onDrop={(e) => handleDrop(e, null)}
             className={cn(
-              'flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all',
+              'flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-all',
               'border border-transparent',
               selectedCategoryId === 'all'
                 ? 'bg-primary/10 text-primary font-medium'
@@ -489,7 +490,7 @@ export function AssetCategoryTree({
             data-category-id="favorites"
             data-is-virtual="true"
             className={cn(
-              'flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all',
+              'flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-all',
               'border border-transparent',
               selectedCategoryId === 'favorites'
                 ? 'bg-primary/10 text-primary font-medium'
@@ -507,7 +508,7 @@ export function AssetCategoryTree({
             data-category-id="uncategorized"
             data-is-virtual="true"
             className={cn(
-              'flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all',
+              'flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-all',
               'border border-transparent',
               selectedCategoryId === 'uncategorized'
                 ? 'bg-primary/10 text-primary font-medium'

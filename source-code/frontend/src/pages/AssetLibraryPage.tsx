@@ -613,11 +613,11 @@ export default function AssetLibraryPage() {
           {!chromeHidden.nav && (
             <AssetCategoryTree
               header={
-                <div className="flex items-center gap-1">
+                <div className="flex w-full items-center gap-1.5 border-b border-border-subtle pb-2">
                   <button
                     onClick={() => setAssetSource('generated')}
                     className={cn(
-                      'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                      'flex-1 truncate rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
                       assetSource === 'generated'
                         ? 'bg-primary/15 text-primary'
                         : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
@@ -628,7 +628,7 @@ export default function AssetLibraryPage() {
                   <button
                     onClick={() => setAssetSource('input')}
                     className={cn(
-                      'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                      'flex-1 truncate rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
                       assetSource === 'input'
                         ? 'bg-primary/15 text-primary'
                         : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
