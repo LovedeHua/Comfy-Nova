@@ -460,10 +460,22 @@ export function AssetTheaterView({
     }
   }, [asset.id, exportToPromptLibrary, t])
 
-  // 缩略图格子尺寸：跟随容器高度，减去上下间隙后取正方形边长
+
+
+  // 行高 = 容器高 − 1px 上边框 − 8px 横向滚动条。
+  // 滚动条（.scrollbar-thin 固定 8px）会吃掉滚动容器的可用高度；不扣掉的话
+  // 格子会被顶出可视区，表现为"缩略图底部显示不全"。
+  const STRIP_BORDER = 1
+  const STRIP_SCROLLBAR = 8
+  const stripRowInnerHeight = Math.max(
+    1,
+    stripBarHeight - STRIP_BORDER - STRIP_SCROLLBAR
+  )
+
+  // 格子边长：行高减去上下 GAP（保持正方形，且与行高同源推导）
   const stripCellSize = useMemo(
-    () => Math.max(32, stripBarHeight - STRIP_GAP * 2),
-    [stripBarHeight]
+    () => Math.max(32, stripRowInnerHeight - STRIP_GAP),
+    [stripRowInnerHeight]
   )
 
   // 轨道跟随当前资产滚动。
@@ -491,10 +503,6 @@ export function AssetTheaterView({
         : cellRight - scroller.clientWidth + STRIP_GAP  // 向右移入
     scroller.scrollLeft = Math.min(Math.max(0, target), maxLeft)
   }, [currentIndex, stripCellSize])
-
-  // Grid 内容区高度：容器高度扣掉 1px 上边框，避免比可用空间高 1px 造成对齐补偿
-  const STRIP_BORDER = 1
-  const stripRowInnerHeight = Math.max(1, stripBarHeight - STRIP_BORDER)
 
   const stripCellData: StripCellData = useMemo(() => ({
     assets,
