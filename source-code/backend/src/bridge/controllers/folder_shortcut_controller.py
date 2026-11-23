@@ -453,6 +453,75 @@ class FolderShortcutController:
                 "error_message": f"打开文件夹选择器失败: {str(e)}"
             }
     
+    def browse_files(self, window=None, title: str = None,
+                     file_types: list = None, multiple: bool = True) -> Dict:
+        """打开文件选择对话框，返回选中的文件绝对路径列表。
+
+        前端「导入」按钮需要选文件，但后端此前只有 browse_folder（选目录），
+        导致 gallery 导入一调用就失败（pywebview 报方法不存在），
+        异常被前端 catch 吞掉，表现成"点了没反应"。
+
+        Args:
+            window: pywebview 窗口对象
+            title: 对话框标题
+            file_types: 形如 ["Image Files (*.png *.jpg)"] 的过滤器列表
+            multiple: 是否允许多选
+
+        Returns:
+            {"success": bool, "paths": list[str], "error_message": str}
+        """
+        try:
+            if not window:
+                return {"success": False, "paths": [], "error_message": "窗口对象未初始化"}
+
+            import webview
+
+            # file_types 用 pywebview 接受的 "描述|*.png;*.jpg" 形式
+            dialog_types = self._normalize_file_types(file_types)
+            result = window.create_file_dialog(
+                dialog_type=webview.FileDialog.OPEN,
+                directory=self._default_browse_directory(),
+                allow_multiple=multiple,
+                file_types=dialog_types,
+            )
+
+            if not result:
+                # 用户取消：不是错误
+                return {"success": True, "paths": []}
+
+            if isinstance(result, str):
+                paths = [result]
+            else:
+                paths = [str(p) for p in result]
+            logger.debug(f"[browse_files] 用户选择: {paths}")
+            return {"success": True, "paths": paths}
+
+        except Exception as e:
+            logger.error(f"[browse_files] 打开文件选择器失败: {e}")
+            return {"success": False, "paths": [], "error_message": f"打开文件选择器失败: {e}"}
+
+    @staticmethod
+    def _normalize_file_types(file_types: list = None) -> tuple:
+        """把 "Image Files (*.png *.jpg)" 规范成 pywebview 的
+        ("Image Files (*.png;*.jpg)",)。解析失败时返回全部文件过滤器。"""
+        fallback = ("All Files (*.*)",)
+        if not file_types:
+            return fallback
+        try:
+            normalized = []
+            for raw in file_types:
+                text = str(raw)
+                open_idx = text.find("(")
+                close_idx = text.rfind(")")
+                if open_idx < 0 or close_idx <= open_idx:
+                    continue
+                label = text[:open_idx].strip()
+                patterns = text[open_idx + 1:close_idx].strip().replace(" ", ";")
+                normalized.append(f"{label} ({patterns})")
+            return tuple(normalized) if normalized else fallback
+        except Exception:
+            return fallback
+
     def set_window(self, window):
         """
         设置窗口引用

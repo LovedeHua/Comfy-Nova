@@ -936,7 +936,9 @@ class GalleryController:
                                 dest_path = import_folder / f"{base_name}_{counter}{suffix}"
                                 counter += 1
 
-                        shutil.move(str(source_path), str(dest_path))
+                        # 用 copy2 而不是 move：导入是"加进资产库"，
+                        # 不该把用户的原始文件从原位移走。
+                        shutil.copy2(str(source_path), str(dest_path))
 
                         category = gallery_storage.get_category_by_folder_path(import_folder_name)
                         category_id = category.id if category else None
@@ -960,7 +962,8 @@ class GalleryController:
                                     dest_path = import_folder / f"{base_name}_{counter}{suffix}"
                                     counter += 1
 
-                            shutil.move(str(file_path), str(dest_path))
+                            # 同上：复制而非移动，保留源文件
+                            shutil.copy2(str(file_path), str(dest_path))
 
                             category = gallery_storage.get_category_by_folder_path(import_folder_name)
                             category_id = category.id if category else None

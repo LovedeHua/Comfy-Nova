@@ -9,6 +9,34 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.7.8
+
+> 发布日期：2026-11-23
+
+### 修复
+
+- **导入按钮没反应（根因）**：前端调用 `browse_files_for_shortcut`
+  选择待导入文件，但**后端根本没有这个方法**——只有 `browse_folder_for_shortcut`
+  （选目录）。调用直接抛错，异常被前端 catch 吞掉，表现为点击毫无反应。
+  新增 `browse_files` / `browse_files_for_shortcut`：
+  用 `FileDialog.OPEN`、支持多选、把 `"Image Files (*.png *.jpg)"`
+  规范成 pywebview 的过滤器格式，并复用已修复的初始目录逻辑
+- **导入会把源文件移走**：导入原本用 `shutil.move`，用户导入后原位置的
+  文件就没了。改为 `shutil.copy2` 复制——"导入"应当是加入资产库，
+  不应改变源文件位置
+- **导入/导出无任何反馈**：成功失败都只 `console.log`，用户看不到结果。
+  补 toast 提示（导入数量 / 导出路径 / 失败原因）
+- **导出后找不到文件**：zip 生成在 `.../gallery/exports/` 深层目录里，
+  用户无从得知。导出成功后自动调用 `open_folder` 打开所在目录
+
+### 实测
+
+- 导入：文件被**复制**（源文件保留）+ 正确入库 ✓
+- 导出：生成 zip 且包含选中的资产（2/2）✓
+- 后端 288 passed；tsc / build 通过
+
+---
+
 ## V1.7.7
 
 > 发布日期：2026-11-23

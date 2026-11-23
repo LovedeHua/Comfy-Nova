@@ -13,6 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { useAssetStore } from '@/stores/useAssetStore'
 import { AssetFilterBar } from './AssetFilterBar'
 import { cn } from '@/lib/utils'
+import { toast } from '@/utils/toast'
 
 interface AssetToolbarProps {
   onOpenSettings?: () => void
@@ -66,14 +67,19 @@ export function AssetToolbar({ onOpenSettings, hideLayoutControls }: AssetToolba
         multiple: true
       })
 
-      if (paths && paths.length > 0) {
-        const result = await importAssets(paths)
-        if (result.success) {
-          console.log('[AssetToolbar] 导入成功:', result.importedCount)
-        }
+      if (!paths || paths.length === 0) {
+        // 用户取消选择：不是错误，静默返回
+        return
+      }
+      const result = await importAssets(paths)
+      if (result.success) {
+        toast.success(t('asset.importSuccess', { count: result.importedCount ?? paths.length }))
+      } else {
+        toast.error(t('asset.importFailed'))
       }
     } catch (error) {
       console.error('[AssetToolbar] 导入失败:', error)
+      toast.error(t('asset.importFailed'))
     } finally {
       setIsImporting(false)
     }
@@ -85,11 +91,21 @@ export function AssetToolbar({ onOpenSettings, hideLayoutControls }: AssetToolba
     try {
       setIsExporting(true)
       const result = await exportZip(selectedAssetIds)
-      if (result.success) {
-        console.log('[AssetToolbar] 导出成功:', result.zipPath)
+      if (result.success && result.zipPath) {
+        // 导出目录较深，用户很难自己找到：直接打开所在文件夹并提示路径
+        const folder = result.zipPath.replace(/[\\/][^\\/]+$/, '')
+        try {
+          await window.pywebview?.api?.open_folder?.(folder)
+        } catch {
+          // 打开失败不影响导出结果，提示里仍有完整路径
+        }
+        toast.success(t('asset.exportSuccess', { path: result.zipPath }))
+      } else {
+        toast.error(t('asset.exportFailed'))
       }
     } catch (error) {
       console.error('[AssetToolbar] 导出失败:', error)
+      toast.error(t('asset.exportFailed'))
     } finally {
       setIsExporting(false)
     }

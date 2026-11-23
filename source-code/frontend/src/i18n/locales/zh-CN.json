@@ -4840,7 +4840,11 @@
     "sourceTab": {
       "generated": "输出资产",
       "input": "输入资产"
-    }
+    },
+    "importSuccess": "已导入 {{count}} 个资产",
+    "importFailed": "导入失败",
+    "exportSuccess": "已导出到 {{path}}",
+    "exportFailed": "导出失败"
   },
   "dataSetup": {
     "title": "选择数据保存位置",

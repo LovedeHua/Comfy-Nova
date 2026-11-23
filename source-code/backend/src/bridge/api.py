@@ -3415,6 +3415,30 @@ class Api:
         """
         return self._folder_shortcut_controller.validate_folder_path(path)
     
+    def browse_files_for_shortcut(self, options: dict = None):
+        """打开文件选择对话框（导入资产用）。
+
+        前端 AssetToolbar 的「导入」按钮调用它；此前后端没有这个方法，
+        调用直接抛错并被前端 catch 吞掉，表现为按钮毫无反应。
+
+        Args:
+            options: {"title": str, "file_types": [str], "multiple": bool}
+
+        Returns:
+            列表中转成前端期望的 ["C:\\path\\a.png", ...] 数组
+        """
+        opts = options or {}
+        result = self._folder_shortcut_controller.browse_files(
+            self._window,
+            title=opts.get("title"),
+            file_types=opts.get("file_types"),
+            multiple=opts.get("multiple", True),
+        )
+        if not result.get("success"):
+            logger.warning(f"[Api] 选择文件失败: {result.get('error_message')}")
+            return []
+        return result.get("paths", [])
+
     def browse_folder_for_shortcut(self):
         """
         打开系统文件夹选择器（用于文件夹快捷方式）

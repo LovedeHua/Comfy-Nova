@@ -4242,7 +4242,11 @@
     "sourceTab": {
       "generated": "Output Assets",
       "input": "Input Assets"
-    }
+    },
+    "importSuccess": "Imported {{count}} asset(s)",
+    "importFailed": "Import failed",
+    "exportSuccess": "Exported to {{path}}",
+    "exportFailed": "Export failed"
   },
   "dataSetup": {
     "title": "Choose Data Location",
