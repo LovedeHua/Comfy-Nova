@@ -81,6 +81,9 @@ interface AssetStore {
   settings: GallerySettings | null
   /** 当前资产来源：generated=生成图库，input=输入图库 */
   assetSource: 'generated' | 'input'
+  /** 两个来源各自的资产缓存：切换标签时直接复用，避免重复请求导致刷新闪烁 */
+  assetsBySource: { generated: Asset[]; input: Asset[] }
+  categoriesBySource: { generated: AssetCategory[]; input: AssetCategory[] }
   selectedCategoryId: string
   selectedAssetIds: string[]
   searchQuery: string
@@ -263,6 +266,8 @@ const filterCache: { key: unknown[]; value: Asset[] } = { key: [], value: [] }
 export const useAssetStore = create<AssetStore>((set, get) => ({
   assets: [],
   categories: [],
+  assetsBySource: { generated: [], input: [] },
+  categoriesBySource: { generated: [], input: [] },
   settings: null,
   selectedCategoryId: 'all',
   selectedAssetIds: [],
@@ -308,9 +313,12 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         const mockCatsForSource = get().assetSource === 'input'
           ? mockAssetCategories.filter((c) => c.source === 'input' || (c.isSystem))
           : mockAssetCategories.filter((c) => !c.source || c.source === 'generated' || c.isSystem)
+        const mockSource = get().assetSource
         set({
           assets: mockForSource,
           categories: mockCatsForSource,
+          assetsBySource: { ...get().assetsBySource, [mockSource]: mockForSource },
+          categoriesBySource: { ...get().categoriesBySource, [mockSource]: mockCatsForSource },
           settings: { libraryPath: '', inputLibraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true },
           isLoading: false
         })
@@ -363,10 +371,16 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
           localStorage.setItem('asset-view-mode', backendViewMode)
         }
 
+        // 把当前来源的数据写入缓存，切标签时可直接复用
+        const assetsCache = { ...get().assetsBySource, [currentSource]: assetsWithThumbnail }
+        const catsCache = { ...get().categoriesBySource, [currentSource]: result.categories || [] }
+
         set({
           assets: assetsWithThumbnail,
           categories: result.categories || [],
           viewMode: restoredViewMode,
+          assetsBySource: assetsCache,
+          categoriesBySource: catsCache,
           assetSource:
             backendSource === 'input' || backendSource === 'generated'
               ? backendSource
@@ -661,10 +675,23 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
 
   setAssetSource: (source) => {
     if (get().assetSource === source) return
-    // 切换标签即切换数据列表：清空当前库数据并重新从后端加载对应库
-    set({ assetSource: source, selectedCategoryId: 'all', assets: [], isLoading: true })
     // 记住当前来源，下次打开保持在同一库
     window.pywebview?.api?.gallery_save_ui_preferences?.(undefined, source)?.catch?.(() => {})
+
+    const cached = get().assetsBySource[source]
+    // 缓存命中：直接切换，不发请求、不清空、不闪烁
+    if (cached && cached.length > 0) {
+      set({
+        assetSource: source,
+        selectedCategoryId: 'all',
+        assets: cached,
+        categories: get().categoriesBySource[source] || [],
+        isLoading: false
+      })
+      return
+    }
+    // 缓存为空才真正加载
+    set({ assetSource: source, selectedCategoryId: 'all', assets: [], isLoading: true })
     get().loadData()
   },
 
