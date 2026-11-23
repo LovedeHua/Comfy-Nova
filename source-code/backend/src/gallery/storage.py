@@ -63,6 +63,7 @@ class GalleryStorage:
                     with open(self._assets_file, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     self._data = GalleryData.from_dict(data)
+                    self._normalize_sources(self._data)
                     logger.info(f"[GalleryStorage] 加载资产库数据: {len(self._data.assets)} 个资产, {len(self._data.categories)} 个分类")
                 except Exception as e:
                     logger.error(f"[GalleryStorage] 加载资产库数据失败: {e}")
@@ -124,6 +125,20 @@ class GalleryStorage:
         except Exception as e:
             logger.error(f"[GalleryStorage] 保存资产库数据失败: {e}")
             return False
+
+    @staticmethod
+    def _normalize_sources(data: "GalleryData") -> None:
+        """把缺失的 source 字段落定为 generated。
+
+        历史数据（品牌更名前的扫描结果）里 source 全是 None。虽然所有查询都用了
+        空值回退到 generated 的判定，但字段留空始终是串库隐患：只要有一处忘了
+        回退，输入库就会显示输出库的图片。加载时统一写实，后续逻辑不再依赖隐式回退。
+        """
+        # AssetCategory 的 source 默认即 "generated"（系统分类也用这个根），
+        # 只有 Asset 会出现历史数据里 source 为空的情况，这里只处理资产。
+        for asset in data.assets:
+            if not asset.source:
+                asset.source = "generated"
 
     def _create_default_data(self) -> GalleryData:
         """创建默认数据"""

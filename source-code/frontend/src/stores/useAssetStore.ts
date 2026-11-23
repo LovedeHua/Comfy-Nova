@@ -263,6 +263,17 @@ const applyMovedAssetPaths = (
 // 放在模块级而不是 state 里，避免触发额外渲染。
 const filterCache: { key: unknown[]; value: Asset[] } = { key: [], value: [] }
 
+/**
+ * 是否已从后端恢复过一次「当前资产来源」。
+ *
+ * 来源是用户显式选择的状态（setAssetSource），loadData 不能再拿后端的
+ * settings.assetSource 覆盖它——那会引发竞态：切到输入库时
+ * gallery_save_ui_preferences 还在异步写盘，紧接着的 loadData 读到的
+ * 仍是旧来源，把 assetSource 改回 generated，导致标签与列表内容错位，
+ * 表现为「输入资产里显示的是输出资产的图片」。
+ */
+let sourceRestoredFromBackend = false
+
 export const useAssetStore = create<AssetStore>((set, get) => ({
   assets: [],
   categories: [],
@@ -371,6 +382,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
           localStorage.setItem('asset-view-mode', backendViewMode)
         }
 
+        sourceRestoredFromBackend = true
+
         // 把当前来源的数据写入缓存，切标签时可直接复用
         const assetsCache = { ...get().assetsBySource, [currentSource]: assetsWithThumbnail }
         const catsCache = { ...get().categoriesBySource, [currentSource]: result.categories || [] }
@@ -381,10 +394,13 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
           viewMode: restoredViewMode,
           assetsBySource: assetsCache,
           categoriesBySource: catsCache,
+          // 只在冷启动首次加载时采纳后端记录的来源；之后一律以用户
+          // 当前选择为准，避免异步保存偏好造成的竞态覆盖。
           assetSource:
-            backendSource === 'input' || backendSource === 'generated'
+            !sourceRestoredFromBackend &&
+            (backendSource === 'input' || backendSource === 'generated')
               ? backendSource
-              : get().assetSource,
+              : currentSource,
           settings: {
             libraryPath: result.settings?.libraryPath || '',
             inputLibraryPath: result.settings?.inputLibraryPath || '',
@@ -1290,8 +1306,17 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       return filterCache.value
     }
 
-    // 数据已由后端按 source 分库返回，state.assets 就是当前库的列表，无需再过滤
-    let filtered = state.assets
+    /*
+     * 数据本应由后端按 source 分库返回，state.assets 就是当前库的列表。
+     * 但状态更新是异步的：切换来源的瞬间 assets 可能还是上一个库的内容。
+     * 这里再按当前来源过滤一次做兜底——旧数据的 source 字段可能为空，
+     * 视为 generated（与后端 get_assets_by_source 的判定保持一致），
+     * 避免"输入资产里出现输出库图片"这类串库。
+     */
+    const currentSource = state.assetSource
+    let filtered = state.assets.filter(
+      (a) => (a.source || 'generated') === currentSource
+    )
 
     if (state.searchQuery) {
       const query = state.searchQuery.toLowerCase()

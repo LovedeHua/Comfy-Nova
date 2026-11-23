@@ -9,6 +9,31 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.7.0
+
+> 发布日期：2026-11-23
+
+### 修复
+
+- **输入资产显示输出库图片（串库）**：三处问题叠加
+  1. `loadData` 用后端 `settings.assetSource` 覆盖了当前来源。而切标签时
+     `gallery_save_ui_preferences` 是异步写盘，紧接着的 loadData 读到的仍是
+     旧来源，把 `assetSource` 改回 `generated`，标签与列表内容因此错位。
+     改为：来源只认用户当前选择，仅冷启动首次加载才采纳后端记录
+  2. `getFilteredAssets` 完全信任 `state.assets` 已按来源分好。加了按
+     当前来源的兜底过滤，即使状态错位也不会显示别的库的图
+  3. 历史数据里 4720 个资产的 `source` 字段全是空（品牌更名前的扫描结果）。
+     加载时统一落定为 `generated`，后续逻辑不再依赖隐式空值回退
+
+### 实测
+
+- 后端：`get_assets('generated')` 只返回生成图、`get_assets('input')` 只返回输入图，
+  两库完全隔离；未配置输入库时 `scan_input` 直接拒绝，不回退到输出目录
+- 旧数据规范化：空 source 落定为 generated，`input` 不受影响
+- 新增来源隔离测试；后端 288 passed；tsc / build 通过
+
+---
+
 ## V1.6.9
 
 > 发布日期：2026-11-23
