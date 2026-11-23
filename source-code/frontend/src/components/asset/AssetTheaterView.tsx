@@ -522,12 +522,17 @@ export function AssetTheaterView({
             stripCellData.onNavigate(item)
           }}
           className={cn(
-            'box-border size-full cursor-pointer overflow-hidden rounded-md bg-surface-active',
-            'transition-[box-shadow,opacity] duration-150',
-            // 两态统一 ring-2 + ring-inset：宽度一致才不会因选中切换产生 1px 位移
+            // 不裁剪这一层：ring 向外画，overflow-hidden 会把它切掉。
+            // 圆角裁切交给内部 img。
+            'box-border size-full cursor-pointer rounded-md bg-surface-active',
+            'transition-[box-shadow,opacity,transform] duration-150',
+            // 选中态：主色 2px 外环（ring 画在元素外侧，不会被 img 盖住；
+            // 用 ring 而非 border，盒子尺寸恒定，点击不位移）+ 轻微提亮
+            // 选中环 3px 更醒目；未选中态同宽度透明环占位，
+            // 保证两态盒模型完全一致、切换不位移。
             isActive
-              ? 'ring-2 ring-primary ring-inset'
-              : 'ring-2 ring-transparent ring-inset hover:opacity-90'
+              ? 'ring-[3px] ring-primary brightness-105'
+              : 'ring-[3px] ring-transparent hover:opacity-85 hover:ring-border-strong/70'
           )}
         >
           <img
@@ -536,7 +541,7 @@ export function AssetTheaterView({
             loading="lazy"
             decoding="async"
             draggable={false}
-            className="size-full object-cover"
+            className="size-full rounded-md object-cover"
           />
         </div>
       </div>
