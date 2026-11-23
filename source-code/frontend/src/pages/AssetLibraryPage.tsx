@@ -255,6 +255,11 @@ export default function AssetLibraryPage() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isSelectingRef.current || !selectionStartRef.current) return
 
+      // 拖动超过阈值：本次按下属于框选，松开的 click 不应触发"点空白退出批量"
+      const dragDx = e.clientX - selectionStartRef.current.x
+      const dragDy = e.clientY - selectionStartRef.current.y
+      if (Math.abs(dragDx) > 3 || Math.abs(dragDy) > 3) hasDraggedRef.current = true
+
       setSelectionEnd({ x: e.clientX, y: e.clientY })
 
       const intersectingIds = getIntersectingCardIds(selectionStartRef.current, { x: e.clientX, y: e.clientY })
@@ -492,10 +497,19 @@ export default function AssetLibraryPage() {
     }
   }, [infoPanelPinned, selectedInfoAsset, theaterAsset, location.state, location.pathname, navigate])
 
+  // 框选拖动标记：mousedown 后鼠标实际移动过（超过阈值）置 true，
+  // 框选松开触发的 click 据此跳过"点空白退出批量"，避免框选完自动退出。
+  const hasDraggedRef = useRef(false)
+
   // 点击页面空白区域：批量模式下退出批量管理（并清空选择）；
   // 非批量下关闭悬浮 info 面板。
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (theaterAsset) return
+    // 框选拖动后的松开不算"点空白"
+    if (hasDraggedRef.current) {
+      hasDraggedRef.current = false
+      return
+    }
     const target = e.target as HTMLElement
     // 不视为"空白"：点击在 info 面板内、卡片上、文件夹卡片上、或任何按钮上
     if (
