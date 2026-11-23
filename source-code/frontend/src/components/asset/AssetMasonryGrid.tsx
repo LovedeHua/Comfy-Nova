@@ -3,7 +3,6 @@
  */
 
 import { useRef, useCallback, forwardRef, useImperativeHandle, useMemo, useState, useEffect } from 'react'
-import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAssetStore } from '@/stores/useAssetStore'
 import { AssetCard } from './AssetCard'
@@ -45,6 +44,9 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
   // 用 thumbnailSize 估算会随窗口/布局宽度产生虚高或塌陷，
   // 表现为滚动区域与界面显示区域不同步。
   const [columnWidth, setColumnWidth] = useState(0)
+  // 虚拟化：只渲染视口附近的卡片，避免 4000+ 卡片全量挂载 React 实例与 store 订阅
+  const [scrollTop, setScrollTop] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(900)
 
     useImperativeHandle(ref, () => ({
       getCardRefs: () => cardRefs.current
@@ -103,6 +105,30 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
       }
     }, [thumbnailSize])
 
+    // 监听滚动容器的 scroll：瀑布流自身不滚动，滚动发生在页面层的容器上。
+    // 用 scrollTop/viewportHeight 驱动窗口化渲染。
+    useEffect(() => {
+      const el = containerRef.current
+      if (!el) return
+      let scroller: HTMLElement | null = el
+      while (scroller && scroller !== document.body) {
+        const overflowY = getComputedStyle(scroller).overflowY
+        if (overflowY === 'auto' || overflowY === 'scroll') break
+        scroller = scroller.parentElement
+      }
+      if (!scroller || scroller === document.body) return
+      const onScroll = () => setScrollTop(scroller!.scrollTop)
+      const onResize = () => setViewportHeight(scroller!.clientHeight || window.innerHeight)
+      onResize()
+      setScrollTop(scroller.scrollTop)
+      scroller.addEventListener('scroll', onScroll, { passive: true })
+      window.addEventListener('resize', onResize)
+      return () => {
+        scroller!.removeEventListener('scroll', onScroll)
+        window.removeEventListener('resize', onResize)
+      }
+    }, [filteredAssets.length])
+
     const columns = useMemo(() => {
       const safeColumnCount = Math.max(1, columnCount)
       const result: Asset[][] = Array.from({ length: safeColumnCount }, () => [])
@@ -124,6 +150,28 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
     const folderGridStyle = useMemo(() => ({
       gridTemplateColumns: `repeat(${Math.max(1, columnCount)}, minmax(0, 1fr))`
     }), [columnCount])
+
+    // 瀑布流窗口化：每列按 estimated height 累积偏移，只渲染视口 ±overscan 内的卡片。
+    // 卡片高 = 图片比例 * 列宽 + 标题栏（约 44px）+ gap。
+    const OVERSCAN = 800
+    const virtualColumns = useMemo(() => {
+      const estH = (asset: Asset) =>
+        Math.round((columnWidth || thumbnailSize) * ((asset.height || 1) / (asset.width || 1))) + 44 + GAP
+      return columns.map((column) => {
+        const offsets: number[] = []
+        let acc = 0
+        for (const asset of column) { offsets.push(acc); acc += estH(asset) }
+        const visible: { asset: Asset; offset: number }[] = []
+        for (let i = 0; i < column.length; i++) {
+          const top = offsets[i]
+          const bottom = top + estH(column[i])
+          if (bottom >= scrollTop - OVERSCAN && top <= scrollTop + viewportHeight + OVERSCAN) {
+            visible.push({ asset: column[i], offset: top })
+          }
+        }
+        return { visible, totalHeight: acc }
+      })
+    }, [columns, columnWidth, thumbnailSize, scrollTop, viewportHeight])
 
     const handleOpenFolder = useCallback((categoryId: string) => {
       clearSelection()
@@ -197,26 +245,17 @@ export const AssetMasonryGrid = forwardRef<AssetMasonryGridRef, AssetMasonryGrid
 
         {filteredAssets.length > 0 && (
           <div className="flex min-w-0 gap-5">
-            {columns.map((column, colIndex) => (
-              <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-5">
-                {column.map((asset) => (
+            {virtualColumns.map((col, colIndex) => (
+              <div key={colIndex} className="relative min-w-0 flex-1" style={{ height: col.totalHeight }}>
+                {col.visible.map(({ asset, offset }) => (
                   <div
                     key={asset.id}
-                    // 瀑布流是变高布局，没法直接用行虚拟化；用 content-visibility
-                    // 让浏览器跳过视口外卡片的布局与绘制。contain-intrinsic-size
-                    // 给一个估算高度，避免滚动条长度跳变。
-                    style={{
-                      contentVisibility: 'auto',
-                      containIntrinsicSize: `auto ${Math.round(
-                        (columnWidth || thumbnailSize) * ((asset.height || 1) / (asset.width || 1))
-                      )}px`
-                    } as CSSProperties}
+                    className="absolute left-0 right-0"
+                    style={{ top: offset }}
                   >
                     <AssetCard
                       asset={asset}
                       ref={getCardRef(asset.id)}
-                      // 传稳定引用：父级只把「处理哪个资产」的职责交给卡片自己，
-                      // 渲染期不再新建箭头函数（包括 ref），否则 memo 会被逐个击穿。
                       onImageClick={onImageClick}
                       onImageDoubleClick={onImageDoubleClick}
                       onView={onView}

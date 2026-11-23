@@ -210,6 +210,9 @@ export default function AssetLibraryPage() {
   const rafRef = useRef<number | null>(null)
   const pendingSelectionEndRef = useRef<{ x: number; y: number } | null>(null)
   const baseSelectedIdsRef = useRef<Set<string>>(new Set())
+  // 拖动中的临时高亮/待提交集合：用 DOM class 直接标记，避免每帧 setState
+  const highlightedIdsRef = useRef<Set<string>>(new Set())
+  const pendingSelectedIdsRef = useRef<Set<string> | null>(null)
   const selectionBoxRef = useRef<HTMLDivElement | null>(null)
 
   const updateSelectionBox = useCallback((start: { x: number; y: number }, end: { x: number; y: number }) => {
@@ -261,7 +264,30 @@ export default function AssetLibraryPage() {
   useEffect(() => {
     if (!isSelecting) return
 
-    const commitSelection = () => {
+    // 拖动中不做任何 setState：4000+ 卡片时每张都订阅 selectedAssetIds，
+    // 每帧 setState 会让全部卡片重渲染并各自执行 includes（O(N²)），直接卡死。
+    // 这里仅维护待提交集合 + 用 DOM class 直接高亮，mouseup 时一次性提交。
+    const applyHighlight = (ids: Set<string>) => {
+      const prev = highlightedIdsRef.current
+      // 移除不再相交的
+      prev.forEach((id) => {
+        if (!ids.has(id)) {
+          const el = gridRef.current?.getCardRefs().get(id)
+          el?.classList.remove('ring-2', 'ring-success', 'ring-offset-2', 'ring-offset-background')
+        }
+      })
+      // 添加新相交的
+      ids.forEach((id) => {
+        if (!prev.has(id)) {
+          const el = gridRef.current?.getCardRefs().get(id)
+          el?.classList.add('ring-2', 'ring-success', 'ring-offset-2', 'ring-offset-background')
+        }
+      })
+      highlightedIdsRef.current = new Set(ids)
+    }
+
+    // 每帧根据当前选区计算相交集合（纯数学，无 DOM 读取），DOM 高亮
+    const frameUpdate = () => {
       rafRef.current = null
       const start = selectionStartRef2.current
       const end = pendingSelectionEndRef.current
@@ -270,20 +296,14 @@ export default function AssetLibraryPage() {
       const right = Math.max(start.x, end.x)
       const top = Math.min(start.y, end.y)
       const bottom = Math.max(start.y, end.y)
-
       const ids = new Set(baseSelectedIdsRef.current)
       for (const r of cardRectsRef.current) {
         if (r.left < right && r.right > left && r.top < bottom && r.bottom > top) {
           ids.add(r.id)
         }
       }
-      const store = useAssetStore.getState()
-      if (ids.size > 0 && !store.isBatchMode) store.setBatchMode(true)
-      // 只在结果变化时提交，避免无谓渲染
-      if (ids.size !== store.selectedAssetIds.length ||
-          Array.from(ids).some(id => !store.selectedAssetIds.includes(id))) {
-        useAssetStore.setState({ selectedAssetIds: Array.from(ids) })
-      }
+      pendingSelectedIdsRef.current = ids
+      applyHighlight(ids)
     }
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -296,18 +316,29 @@ export default function AssetLibraryPage() {
       const end = { x: e.clientX, y: e.clientY }
       pendingSelectionEndRef.current = end
       updateSelectionBox(start, end)  // DOM 直写，零 React 渲染
-      if (rafRef.current === null) rafRef.current = requestAnimationFrame(commitSelection)
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame(frameUpdate)
     }
 
     const handleMouseUp = () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
-        commitSelection()
+        frameUpdate()
       }
-      // 未拖动 = 单击空白：退出批量管理 / 关闭 info 面板。
-      // 放在 mousedown/mouseup 配对里，网格视图与瀑布流一致，不依赖 click 冒泡。
-      if (!hasDraggedRef.current) {
+      // 一次性提交选中结果（只渲染一次，不是每帧）
+      const finalIds = pendingSelectedIdsRef.current
+      if (finalIds && finalIds.size > 0) {
+        const store = useAssetStore.getState()
+        if (!store.isBatchMode) store.setBatchMode(true)
+        // 清除 DOM 临时高亮，交给 React 用 state 正确渲染
+        highlightedIdsRef.current.forEach((id) => {
+          const el = gridRef.current?.getCardRefs().get(id)
+          el?.classList.remove('ring-2', 'ring-success', 'ring-offset-2', 'ring-offset-background')
+        })
+        highlightedIdsRef.current.clear()
+        useAssetStore.setState({ selectedAssetIds: Array.from(finalIds) })
+      } else if (!hasDraggedRef.current) {
+        // 未拖动 = 单击空白：退出批量管理 / 关闭 info 面板
         const flags = blankClickFlagsRef.current
         if (flags.wasBatchMode) {
           useAssetStore.getState().setBatchMode(false)
@@ -319,6 +350,7 @@ export default function AssetLibraryPage() {
       isSelectingRef2.current = false
       selectionStartRef2.current = null
       pendingSelectionEndRef.current = null
+      pendingSelectedIdsRef.current = null
       cardRectsRef.current = []
       if (selectionBoxRef.current) selectionBoxRef.current.style.display = 'none'
       setIsSelecting(false)

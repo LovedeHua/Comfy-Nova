@@ -443,6 +443,7 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       set({ isScanning: false })
 
       if (result.success) {
+        // 后端已在增量扫描时同步输入库，这里一次刷新即可拿到两库最新数据
         await get().loadData()
         return {
           success: true,

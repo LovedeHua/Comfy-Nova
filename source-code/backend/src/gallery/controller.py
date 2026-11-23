@@ -339,6 +339,19 @@ class GalleryController:
                 return {"success": False, "error_message": "未配置资产库路径"}
 
             result = gallery_scanner.scan_library_incremental(library_path)
+
+            # 同步输入图片库：配置了路径就一起扫，保证输入图自动导入。
+            # 输入库由 scan_input_library 用 source=input 隔离处理，不影响生成库数据。
+            settings = gallery_storage.get_settings()
+            if settings.input_library_path:
+                try:
+                    input_result = gallery_scanner.scan_input_library(settings.input_library_path)
+                    result["input_added"] = input_result.get("added", 0)
+                    result["input_removed"] = input_result.get("removed", 0)
+                except Exception as input_error:
+                    logger.warning(f"[GalleryController] 输入库同步失败: {input_error}")
+                    result["input_error"] = str(input_error)
+
             result["success"] = True
             return result
         except Exception as e:
