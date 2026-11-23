@@ -549,7 +549,10 @@ export function AssetTheaterView({
             loading="lazy"
             decoding="async"
             draggable={false}
-            className="size-full rounded-md object-cover"
+            // object-contain：胶片条格子是正方形，用 cover 会把竖图的上下、
+            // 横图的左右裁掉，看起来"图片显示不全"。contain 保证整图可见，
+            // 空白处由格子底色填充。
+            className="size-full rounded-md bg-black/20 object-contain"
           />
         </div>
       </div>
