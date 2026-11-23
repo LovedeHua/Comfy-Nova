@@ -474,6 +474,10 @@ export function AssetTheaterView({
     [stripBarHeight]
   )
 
+  // Grid 内容区高度：容器高度扣掉 1px 上边框，避免比可用空间高 1px 造成对齐补偿
+  const STRIP_BORDER = 1
+  const stripRowInnerHeight = Math.max(1, stripBarHeight - STRIP_BORDER)
+
   const stripCellData: StripCellData = useMemo(() => ({
     assets,
     activeId: asset.id,
@@ -485,20 +489,34 @@ export function AssetTheaterView({
     const item = stripCellData.assets[columnIndex]
     if (!item) return null
 
+    const isActive = item.id === stripCellData.activeId
+
     return (
+      // 用原生 div 而非 Button：Button 自带 h-9 px-4 py-2，与 size-full 冲突，
+      // 选中态切换边框时会把内容挤动，表现为"点击时缩略图大小跳一下"。
+      // 外层固定盒子尺寸，选中态用 ring（不占布局）而非 border 宽度变化。
       <div style={{ ...style, padding: STRIP_GAP / 2 }}>
-        <Button
-          variant="ghost"
+        <div
+          role="button"
+          tabIndex={0}
+          title={item.filename}
           onClick={() => {
             if (stripCellData.shouldSuppressClick()) return
             stripCellData.onNavigate(item)
           }}
-          title={item.filename}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              stripCellData.onNavigate(item)
+            }
+          }}
           className={cn(
-            'size-full overflow-hidden rounded-md border-2 bg-surface-active p-0',
-            item.id === stripCellData.activeId
-              ? 'border-primary'
-              : 'border-transparent hover:border-border-strong'
+            'box-border size-full cursor-pointer overflow-hidden rounded-md bg-surface-active',
+            'transition-[box-shadow,opacity] duration-150',
+            // 两态统一 ring-2 + ring-inset：宽度一致才不会因选中切换产生 1px 位移
+            isActive
+              ? 'ring-2 ring-primary ring-inset'
+              : 'ring-2 ring-transparent ring-inset hover:opacity-90'
           )}
         >
           <img
@@ -506,9 +524,10 @@ export function AssetTheaterView({
             alt={item.filename}
             loading="lazy"
             decoding="async"
+            draggable={false}
             className="size-full object-cover"
           />
-        </Button>
+        </div>
       </div>
     )
   }, [stripCellData])
@@ -839,36 +858,40 @@ export function AssetTheaterView({
         )}
       </div>
 
-      {/* 高度调整手柄：拖动上边缘改变胶片条高度，双击复位默认值 */}
-      <div
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label={t('asset.theater.resizeStrip')}
-        title={t('asset.theater.resizeStrip')}
-        className={cn(
-          'group/resize flex h-1.5 shrink-0 cursor-ns-resize items-center justify-center',
-          'border-t border-border-subtle bg-surface transition-colors',
-          isResizingStrip ? 'bg-primary/30' : 'hover:bg-primary/20'
-        )}
-        onPointerDown={handleStripResizeDown}
-        onPointerMove={handleStripResizeMove}
-        onPointerUp={handleStripResizeUp}
-        onPointerCancel={handleStripResizeUp}
-        onDoubleClick={handleStripResizeReset}
-      >
+      {/* 胶片条容器：手柄绝对定位叠在上边缘，不占布局——
+          放进流里会挤压 Grid 高度，导致列宽重算、滚动位置漂移 */}
+      <div className="relative shrink-0">
         <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t('asset.theater.resizeStrip')}
+          title={t('asset.theater.resizeStrip')}
           className={cn(
-            'h-0.5 w-10 rounded-full transition-colors',
-            isResizingStrip ? 'bg-primary' : 'bg-border-strong group-hover/resize:bg-primary/70'
+            'group/resize absolute inset-x-0 -top-1 z-10 flex h-2 cursor-ns-resize items-center justify-center',
+            isResizingStrip && 'bg-primary/20'
           )}
-        />
-      </div>
+          onPointerDown={handleStripResizeDown}
+          onPointerMove={handleStripResizeMove}
+          onPointerUp={handleStripResizeUp}
+          onPointerCancel={handleStripResizeUp}
+          onDoubleClick={handleStripResizeReset}
+        >
+          <div
+            className={cn(
+              'h-0.5 w-10 rounded-full transition-all duration-150',
+              isResizingStrip
+                ? 'bg-primary'
+                : 'bg-border-subtle group-hover/resize:w-14 group-hover/resize:bg-primary/70'
+            )}
+          />
+        </div>
 
       <div
         ref={stripRef}
         style={{ height: stripBarHeight }}
         className={cn(
-          'shrink-0 bg-surface',
+          // box-border：1px 上边框包含在 height 内，Grid 的内容区因此是 stripBarHeight-1
+          'box-border border-t border-border-subtle bg-surface',
           isStripDragging ? 'cursor-grabbing' : 'cursor-grab'
         )}
         onPointerDown={handleStripPointerDown}
@@ -882,8 +905,8 @@ export function AssetTheaterView({
             columnCount={assets.length}
             columnWidth={stripCellSize + STRIP_GAP}
             rowCount={1}
-            rowHeight={stripBarHeight}
-            defaultHeight={stripBarHeight}
+            rowHeight={stripRowInnerHeight}
+            defaultHeight={stripRowInnerHeight}
             defaultWidth={stripSize.width}
             overscanCount={4}
             cellComponent={StripCell}
@@ -892,6 +915,7 @@ export function AssetTheaterView({
             style={{ overflowY: 'hidden' }}
           />
         )}
+      </div>
       </div>
     </div>
   )
