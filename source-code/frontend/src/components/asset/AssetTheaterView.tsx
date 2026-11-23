@@ -59,9 +59,20 @@ interface StripCellData {
   shouldSuppressClick: () => boolean
 }
 
-const STRIP_WIDTH = 96
-const STRIP_HEIGHT = 68
 const STRIP_GAP = 6
+
+/** 胶片条容器高度（可拖动调整，持久化到 localStorage） */
+const STRIP_BAR_MIN = 60
+const STRIP_BAR_MAX = 240
+const STRIP_BAR_DEFAULT = 76
+const STRIP_BAR_STORAGE_KEY = 'theater-strip-height'
+
+/** 读取上次保存的胶片条高度，越界值收敛到允许区间 */
+function readStoredStripBarHeight(): number {
+  const raw = Number(localStorage.getItem(STRIP_BAR_STORAGE_KEY))
+  if (!Number.isFinite(raw) || raw <= 0) return STRIP_BAR_DEFAULT
+  return Math.min(STRIP_BAR_MAX, Math.max(STRIP_BAR_MIN, raw))
+}
 
 const CHROME_REGIONS: ChromeRegion[] = ['nav', 'filter', 'detail']
 
@@ -116,6 +127,10 @@ export function AssetTheaterView({
   const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false)
   const [isArrowHover, setIsArrowHover] = useState(false)
   const [scaleLabel, setScaleLabel] = useState(1)
+  // 底部胶片条容器高度：可拖动上边缘调整，缩略图按容器高度自适应缩放
+  const [stripBarHeight, setStripBarHeight] = useState(readStoredStripBarHeight)
+  const [isResizingStrip, setIsResizingStrip] = useState(false)
+  const stripResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
 
   const {
     transform,
@@ -350,6 +365,41 @@ export function AssetTheaterView({
     }
   }, [])
 
+  // 胶片条高度调整：拖动手柄上下移动改变高度，松手落盘，双击复位
+  const handleStripResizeDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    stripResizeRef.current = { startY: event.clientY, startHeight: stripBarHeight }
+    setIsResizingStrip(true)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }, [stripBarHeight])
+
+  const handleStripResizeMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const state = stripResizeRef.current
+    if (!state) return
+    event.preventDefault()
+    // 往上拖 = 变高，所以用 startY - clientY 的差值
+    const next = Math.min(
+      STRIP_BAR_MAX,
+      Math.max(STRIP_BAR_MIN, state.startHeight + (state.startY - event.clientY))
+    )
+    setStripBarHeight(next)
+  }, [])
+
+  const handleStripResizeUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!stripResizeRef.current) return
+    stripResizeRef.current = null
+    setIsResizingStrip(false)
+    // 落盘：下次进入影院沿用这个高度
+    localStorage.setItem(STRIP_BAR_STORAGE_KEY, String(stripBarHeight))
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId) } catch { /* 忽略 */ }
+  }, [stripBarHeight])
+
+  const handleStripResizeReset = useCallback(() => {
+    setStripBarHeight(STRIP_BAR_DEFAULT)
+    localStorage.setItem(STRIP_BAR_STORAGE_KEY, String(STRIP_BAR_DEFAULT))
+  }, [])
+
   // 预取前后各一张的原图。左右切换时绝大多数情况下都能命中浏览器缓存，
   // 从而把"切换后等解码"挪到"切换时已经解好"。
   // 只预取相邻各一张：再多会同时把多张 4K 图压进内存，反而更吃资源。
@@ -417,6 +467,12 @@ export function AssetTheaterView({
       toast.error(result.error_message || t('asset.toast.importToPromptLibraryFailed'))
     }
   }, [asset.id, exportToPromptLibrary, t])
+
+  // 缩略图格子尺寸：跟随容器高度，减去上下间隙后取正方形边长
+  const stripCellSize = useMemo(
+    () => Math.max(32, stripBarHeight - STRIP_GAP * 2),
+    [stripBarHeight]
+  )
 
   const stripCellData: StripCellData = useMemo(() => ({
     assets,
@@ -665,21 +721,30 @@ export function AssetTheaterView({
             onMouseEnter={() => setIsArrowHover(true)}
             onMouseLeave={() => setIsArrowHover(false)}
             className={cn(
-              'absolute left-1/2 top-0 z-30 flex h-[41px] w-8 -translate-x-1/2 items-center justify-center pointer-events-auto',
-              'text-muted-foreground transition-all duration-200 hover:text-foreground',
+              'group absolute left-1/2 top-0 z-30 flex h-[41px] w-8 -translate-x-1/2 items-center justify-center',
+              'pointer-events-auto text-muted-foreground outline-none',
+              'transition-[background-color,color,box-shadow,transform] duration-200 ease-out',
+              'focus-visible:ring-2 focus-visible:ring-primary/60',
               isToolbarCollapsed
                 ? cn(
-                    'h-[41px] rounded-b-md border border-x-0 border-t-0 border-border-subtle bg-surface/50',
-                    isArrowHover ? 'opacity-100 bg-surface/80' : 'opacity-0'
+                    'h-[41px] rounded-b-md border border-x-0 border-t-0 border-border-subtle',
+                    // 收起态默认隐形，悬停浮现：底色更实 + 阴影 + 轻微下沉，形成明显的可点反馈
+                    isArrowHover
+                      ? 'bg-surface text-foreground opacity-100 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.25)]'
+                      : 'bg-surface/50 opacity-0'
                   )
                 : cn(
-                    'border-b border-border-subtle bg-surface/50'
+                    'border-b border-border-subtle',
+                    // 展开态：融入工具条底色，悬停时提亮并透出内阴影，指示可收起
+                    isArrowHover
+                      ? 'bg-surface text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary)/0.6)]'
+                      : 'bg-surface/50'
                   )
             )}
           >
             {isToolbarCollapsed
-              ? <ChevronDown className="size-3" />
-              : <ChevronUp className="size-3" />}
+              ? <ChevronDown className="size-3 transition-transform duration-200 group-hover:translate-y-0.5" />
+              : <ChevronUp className="size-3 transition-transform duration-200 group-hover:-translate-y-0.5" />}
           </button>
           </div>
 
@@ -774,11 +839,36 @@ export function AssetTheaterView({
         )}
       </div>
 
+      {/* 高度调整手柄：拖动上边缘改变胶片条高度，双击复位默认值 */}
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={t('asset.theater.resizeStrip')}
+        title={t('asset.theater.resizeStrip')}
+        className={cn(
+          'group/resize flex h-1.5 shrink-0 cursor-ns-resize items-center justify-center',
+          'border-t border-border-subtle bg-surface transition-colors',
+          isResizingStrip ? 'bg-primary/30' : 'hover:bg-primary/20'
+        )}
+        onPointerDown={handleStripResizeDown}
+        onPointerMove={handleStripResizeMove}
+        onPointerUp={handleStripResizeUp}
+        onPointerCancel={handleStripResizeUp}
+        onDoubleClick={handleStripResizeReset}
+      >
+        <div
+          className={cn(
+            'h-0.5 w-10 rounded-full transition-colors',
+            isResizingStrip ? 'bg-primary' : 'bg-border-strong group-hover/resize:bg-primary/70'
+          )}
+        />
+      </div>
+
       <div
         ref={stripRef}
+        style={{ height: stripBarHeight }}
         className={cn(
-          // 从 86px 收到 76px：只是省一点垂直空间，缩略图仍清晰可辨
-          'h-[76px] shrink-0 border-t border-border-subtle bg-surface',
+          'shrink-0 bg-surface',
           isStripDragging ? 'cursor-grabbing' : 'cursor-grab'
         )}
         onPointerDown={handleStripPointerDown}
@@ -790,10 +880,10 @@ export function AssetTheaterView({
           <Grid
             gridRef={gridRef}
             columnCount={assets.length}
-            columnWidth={STRIP_WIDTH + STRIP_GAP}
+            columnWidth={stripCellSize + STRIP_GAP}
             rowCount={1}
-            rowHeight={STRIP_HEIGHT + STRIP_GAP}
-            defaultHeight={STRIP_HEIGHT + STRIP_GAP}
+            rowHeight={stripBarHeight}
+            defaultHeight={stripBarHeight}
             defaultWidth={stripSize.width}
             overscanCount={4}
             cellComponent={StripCell}
