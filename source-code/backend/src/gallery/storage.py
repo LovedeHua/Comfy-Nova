@@ -549,6 +549,26 @@ class GalleryStorage:
         data = self.load()
         return [a for a in data.assets if (a.source or "generated") == source]
 
+    def clear_all_thumbnail_paths(self) -> int:
+        """清空所有资产的 thumbnail_path 字段（配合删除缩略图文件使用）。
+
+        缩略图文件被删后若仍保留 thumbnail_path，gallery_get_thumbnail 会因
+        文件不存在返回 None，前端显示破图。清空字段后路由回退到原图，
+        下次进资产库时后台 backfill 自动重建缩略图。
+
+        Returns:
+            被清空的资产数量
+        """
+        data = self.load()
+        count = 0
+        for asset in data.assets:
+            if asset.thumbnail_path:
+                asset.thumbnail_path = None
+                count += 1
+        if count > 0:
+            self.save()
+        return count
+
     def get_asset_by_id(self, asset_id: str) -> Optional[Asset]:
         """根据 ID 获取资产"""
         data = self.load()

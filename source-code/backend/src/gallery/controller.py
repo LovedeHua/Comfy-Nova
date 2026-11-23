@@ -1279,6 +1279,71 @@ class GalleryController:
             logger.error(f"[GalleryController] 删除分类失败：{e}")
             return {"success": False, "error_message": str(e)}
 
+    def gallery_get_thumbnail_stats(self) -> dict:
+        """统计缩略图缓存占用（文件数 / 总字节）。"""
+        try:
+            thumbs_dir = gallery_storage.thumbnails_dir
+            if not thumbs_dir.exists():
+                return {"success": True, "file_count": 0, "size_bytes": 0}
+
+            file_count = 0
+            size_bytes = 0
+            for item in thumbs_dir.rglob("*"):
+                if item.is_file():
+                    try:
+                        size_bytes += item.stat().st_size
+                        file_count += 1
+                    except OSError:
+                        continue
+            return {"success": True, "file_count": file_count, "size_bytes": size_bytes}
+        except Exception as e:
+            logger.error(f"[GalleryController] 统计缩略图缓存失败: {e}")
+            return {"success": False, "error_message": str(e)}
+
+    def gallery_clear_thumbnails(self) -> dict:
+        """清空缩略图缓存。
+
+        删除 thumbnails 目录下全部文件，并清空资产的 thumbnail_path 字段：
+        只删文件不清字段会导致列表破图（get_thumbnail 找不到文件返回 None）。
+        清空字段后 /gallery/thumbnail 回退原图，下次进资产库后台 backfill
+        自动重建。
+        """
+        try:
+            thumbs_dir = gallery_storage.thumbnails_dir
+            cleared_files = 0
+            cleared_bytes = 0
+
+            if thumbs_dir.exists():
+                for item in list(thumbs_dir.rglob("*")):
+                    if not item.is_file():
+                        continue
+                    try:
+                        size = item.stat().st_size
+                        item.unlink()
+                        cleared_files += 1
+                        cleared_bytes += size
+                    except OSError as e:
+                        logger.warning(f"[GalleryController] 删除缩略图失败 {item}: {e}")
+
+            cleared_assets = gallery_storage.clear_all_thumbnail_paths()
+
+            # 重置 backfill 标记：下次进资产库会重新生成
+            gallery_scanner.reset_thumbnail_backfill_state()
+
+            logger.info(
+                f"[GalleryController] 已清理缩略图: {cleared_files} 个文件 / "
+                f"{cleared_bytes / 1024 / 1024:.1f} MB，{cleared_assets} 个资产标记重置"
+            )
+            return {
+                "success": True,
+                "cleared_files": cleared_files,
+                "cleared_bytes": cleared_bytes,
+                "cleared_assets": cleared_assets,
+            }
+        except Exception as e:
+            logger.error(f"[GalleryController] 清理缩略图失败: {e}")
+            return {"success": False, "error_message": str(e)}
+
     def gallery_get_thumbnail(self, asset_id: str) -> Optional[Response]:
         """
         获取资产缩略图

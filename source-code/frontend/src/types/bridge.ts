@@ -1684,6 +1684,21 @@ export interface PyWebViewAPI {
     error_message?: string
   }>;
 
+  gallery_get_thumbnail_stats: () => Promise<{
+    success: boolean
+    file_count?: number
+    size_bytes?: number
+    error_message?: string
+  }>;
+
+  gallery_clear_thumbnails: () => Promise<{
+    success: boolean
+    cleared_files?: number
+    cleared_bytes?: number
+    cleared_assets?: number
+    error_message?: string
+  }>;
+
   gallery_get_asset: (assetId: string) => Promise<{
     success: boolean
     asset?: {

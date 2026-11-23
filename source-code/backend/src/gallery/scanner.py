@@ -650,6 +650,10 @@ class GalleryScanner:
         finally:
             self._thumbnails_backfilled = True
 
+    def reset_thumbnail_backfill_state(self) -> None:
+        """重置缩略图补齐标记，让下次进资产库时重新生成。"""
+        self._thumbnails_backfilled = False
+
     def backfill_image_thumbnails(self, force: bool = False) -> int:
         """为历史图片资产补生成缩略图。
 

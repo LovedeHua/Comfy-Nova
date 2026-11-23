@@ -7809,6 +7809,14 @@ class Api:
         """删除分类（内容先上浮一级）"""
         return self._gallery_controller.gallery_delete_category(category_id, move_contents_to_parent)
 
+    def gallery_get_thumbnail_stats(self) -> dict:
+        """统计缩略图缓存占用"""
+        return self._gallery_controller.gallery_get_thumbnail_stats()
+
+    def gallery_clear_thumbnails(self) -> dict:
+        """清空缩略图缓存（下次进资产库自动重建）"""
+        return self._gallery_controller.gallery_clear_thumbnails()
+
     def gallery_get_thumbnail(self, asset_id: str):
         """获取资产缩略图（返回 Flask Response）"""
         return self._gallery_controller.gallery_get_thumbnail(asset_id)

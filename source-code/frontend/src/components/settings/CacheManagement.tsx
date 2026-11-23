@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trash2, RefreshCw, HardDrive, FileText, Clock } from 'lucide-react'
+import { Trash2, RefreshCw, HardDrive, FileText, Clock, Image as ImageIcon } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@/components/ui'
 import {
   AlertDialog,
@@ -46,6 +46,9 @@ export function CacheManagement() {
   const [loading, setLoading] = useState(true)
   const [clearingType, setClearingType] = useState<string | null>(null)
   const [clearingAll, setClearingAll] = useState(false)
+  // 资产库缩略图缓存：不在通用缓存体系里（属于资产数据目录），单独管理
+  const [thumbStats, setThumbStats] = useState<{ file_count: number; size_bytes: number } | null>(null)
+  const [clearingThumbs, setClearingThumbs] = useState(false)
 
   const loadStats = async () => {
     setLoading(true)
@@ -55,11 +58,17 @@ export function CacheManagement() {
         return
       }
 
-      const result = await window.pywebview.api.get_cache_stats()
+      const [result, thumbResult] = await Promise.all([
+        window.pywebview.api.get_cache_stats(),
+        window.pywebview.api.gallery_get_thumbnail_stats?.()
+      ])
       if (result.success && result.data) {
         setStats(result.data)
       } else {
         toast.error(t('settings.cache.loadError'))
+      }
+      if (thumbResult?.success) {
+        setThumbStats({ file_count: thumbResult.file_count ?? 0, size_bytes: thumbResult.size_bytes ?? 0 })
       }
     } catch (error) {
       console.error('加载缓存统计失败:', error)
@@ -118,6 +127,32 @@ export function CacheManagement() {
       toast.error(t('settings.cache.clearError'))
     } finally {
       setClearingAll(false)
+    }
+  }
+
+  const handleClearThumbnails = async () => {
+    setClearingThumbs(true)
+    try {
+      if (!window.pywebview?.api) {
+        toast.error(t('common.apiUnavailable'))
+        return
+      }
+      const result = await window.pywebview.api.gallery_clear_thumbnails()
+      if (result.success) {
+        const size = formatSize(result.cleared_bytes || 0)
+        toast.success(t('settings.cache.thumbnails.cleared', {
+          count: result.cleared_files || 0,
+          size
+        }))
+        await loadStats()
+      } else {
+        toast.error(result.error_message || t('settings.cache.clearError'))
+      }
+    } catch (error) {
+      console.error('清理缩略图失败:', error)
+      toast.error(t('settings.cache.clearError'))
+    } finally {
+      setClearingThumbs(false)
     }
   }
 
@@ -239,6 +274,65 @@ export function CacheManagement() {
           </Card>
         ))}
       </div>
+
+      {/* 资产库缩略图缓存：独立于上面的通用缓存体系（存在资产数据目录） */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ImageIcon className="size-4 text-primary" />
+            {t('settings.cache.thumbnails.title')}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {t('settings.cache.thumbnails.description')}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="flex items-center gap-2">
+              <HardDrive className="size-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">{t('settings.cache.size')}:</span>
+              <span className="font-medium">{formatSize(thumbStats?.size_bytes ?? 0)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FileText className="size-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">{t('settings.cache.fileCount')}:</span>
+              <span className="font-medium">{thumbStats?.file_count ?? 0}</span>
+            </div>
+          </div>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={clearingThumbs || (thumbStats?.file_count ?? 0) === 0}
+              >
+                {clearingThumbs ? (
+                  <RefreshCw className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 size-4" />
+                )}
+                {t('settings.cache.thumbnails.clear')}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('settings.cache.thumbnails.confirmTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('settings.cache.thumbnails.confirmDescription')}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleClearThumbnails}>
+                  {t('common.confirm')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
 
       {/* 总计和一键清理 */}
       <Card>

@@ -2804,6 +2804,14 @@
       "confirmClearAll": {
         "title": "Confirm Clear All Cache",
         "description": "Are you sure you want to clear all cache? All cached data will be deleted and regenerated on next use."
+      },
+      "thumbnails": {
+        "title": "Thumbnail Cache",
+        "description": "Thumbnails used by the asset library grid and theater mode. They will be regenerated next time you open the asset library.",
+        "clear": "Clear Thumbnail Cache",
+        "confirmTitle": "Clear thumbnail cache?",
+        "confirmDescription": "All thumbnail files will be deleted and their records reset. The library will fall back to original images until thumbnails are rebuilt in the background on your next visit.",
+        "cleared": "Cleared {{count}} thumbnails ({{size}})"
       }
     },
     "enableGithubToken": "Enable GitHub API Token",
