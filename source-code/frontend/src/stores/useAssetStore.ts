@@ -299,8 +299,12 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       if (isDevelopment()) {
         console.log('[useAssetStore] 开发环境：使用 Mock 数据')
         await new Promise((resolve) => setTimeout(resolve, 300))
+        // mock 数据无 source 视为 generated；输入图库在 mock 下为空
+        const mockForSource = get().assetSource === 'input'
+          ? mockAssets.filter((a) => a.source === 'input')
+          : mockAssets.filter((a) => !a.source || a.source === 'generated')
         set({
-          assets: mockAssets,
+          assets: mockForSource,
           categories: mockAssetCategories,
           settings: { libraryPath: '', inputLibraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true },
           isLoading: false
@@ -309,7 +313,9 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       }
 
       console.log('[useAssetStore] 生产环境：调用后端 API gallery_get_assets')
-      const result = await window.pywebview.api.gallery_get_assets()
+      // 按当前来源分库加载：生成图库/输入图库各自独立的列表，不共用
+      const currentSource = get().assetSource
+      const result = await window.pywebview.api.gallery_get_assets(currentSource)
       console.log('[useAssetStore] API 返回结果:', {
         success: result.success,
         assetsCount: result.assets?.length,
@@ -633,7 +639,9 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
 
   setAssetSource: (source) => {
     if (get().assetSource === source) return
-    set({ assetSource: source, selectedCategoryId: 'all' })
+    // 切换标签即切换数据列表：清空当前库数据并重新从后端加载对应库
+    set({ assetSource: source, selectedCategoryId: 'all', assets: [], isLoading: true })
+    get().loadData()
   },
 
   setSelectedCategoryId: (id) => set({ selectedCategoryId: id }),
@@ -1228,10 +1236,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       return filterCache.value
     }
 
+    // 数据已由后端按 source 分库返回，state.assets 就是当前库的列表，无需再过滤
     let filtered = state.assets
-
-    // 来源隔离：生成图库与输入图库互不可见
-    filtered = filtered.filter((a) => (a.source ?? 'generated') === state.assetSource)
 
     if (state.searchQuery) {
       const query = state.searchQuery.toLowerCase()

@@ -1639,7 +1639,7 @@ export interface PyWebViewAPI {
 
   // ========== 资产库 API ==========
 
-  gallery_get_assets: () => Promise<{
+  gallery_get_assets: (source?: string) => Promise<{
     success: boolean
     assets?: Array<{
       id: string

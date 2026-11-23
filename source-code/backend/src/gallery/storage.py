@@ -510,6 +510,11 @@ class GalleryStorage:
         data = self.load()
         return data.assets
 
+    def get_assets_by_source(self, source: str) -> list[Asset]:
+        """按来源获取资产列表，生成图库与输入图库在数据层彻底分离。"""
+        data = self.load()
+        return [a for a in data.assets if (a.source or "generated") == source]
+
     def get_asset_by_id(self, asset_id: str) -> Optional[Asset]:
         """根据 ID 获取资产"""
         data = self.load()

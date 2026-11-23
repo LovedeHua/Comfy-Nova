@@ -7663,9 +7663,9 @@ class Api:
         """
         return self._workflow_controller.get_local_scan_status()
 
-    def gallery_get_assets(self) -> dict:
-        """获取资产列表"""
-        return self._gallery_controller.gallery_get_assets()
+    def gallery_get_assets(self, source: str = None) -> dict:
+        """获取资产列表（source=generated/input 分库返回）"""
+        return self._gallery_controller.gallery_get_assets(source)
 
     def gallery_get_asset(self, asset_id: str) -> dict:
         """获取单个资产详情"""

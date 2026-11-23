@@ -40,9 +40,13 @@ class GalleryController:
         """scope 变化后重算路径。"""
         self._refresh_paths()
 
-    def gallery_get_assets(self) -> dict:
+    def gallery_get_assets(self, source: str = None) -> dict:
         """
         获取资产列表
+
+        Args:
+            source: 资产来源过滤（generated=生成图库，input=输入图库）。
+                    不传则返回全部（兼容旧调用方）。两库在数据层分开返回。
 
         Returns:
             {
@@ -60,7 +64,12 @@ class GalleryController:
             # 只是加载慢，功能不受影响；补齐后自动恢复轻量路径。
             gallery_scanner.start_thumbnail_backfill()
 
-            assets = gallery_storage.get_assets()
+            # 按来源分库返回：前端两个标签页各自加载自己的列表，互不混用
+            assets = (
+                gallery_storage.get_assets_by_source(source)
+                if source
+                else gallery_storage.get_assets()
+            )
             categories = gallery_storage.get_categories()
             settings = gallery_storage.get_settings()
 
