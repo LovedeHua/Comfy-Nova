@@ -111,6 +111,7 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
         setInputLibraryPath('C:\\Users\\Example\\Documents\\ComfyUI\\input')
       } else {
         const response = await window.pywebview.api.browse_folder_for_shortcut()
+        console.log('[AssetSettingsDialog] 浏览输入库返回:', response)
         if (response.success && response.path) {
           setInputLibraryPath(response.path)
         } else if (response.error_message) {
@@ -131,7 +132,12 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
 
     setSaving(true)
     try {
-      console.log('[AssetSettingsDialog] 保存设置:', libraryPath.trim())
+      // 诊断日志：留空与填值的区别直接体现出来，便于排查"保存不下来"
+      console.log('[AssetSettingsDialog] 保存请求', {
+        libraryPath: libraryPath.trim(),
+        inputLibraryPath: inputLibraryPath.trim(),
+        inputIsEmpty: !inputLibraryPath.trim()
+      })
       const success = await saveSettings(libraryPath.trim(), inputLibraryPath.trim())
       console.log('[AssetSettingsDialog] 保存结果:', success)
 

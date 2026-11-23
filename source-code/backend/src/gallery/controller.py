@@ -252,11 +252,23 @@ class GalleryController:
             }
         """
         try:
+            # 记录实际收到的参数：排查"保存不下来"时，先看日志里到底有没有
+            # 收到这个值、收到的是什么。
+            logger.info(
+                f"[GalleryController] 保存资产库设置: "
+                f"library_path={library_path!r}, input_library_path={input_library_path!r}"
+            )
             # input_library_path 为空时视为"不修改"，避免用户只改输出路径
             # 却把已配置的输入库清空（历史 bug：输入路径保存不下来）。
             gallery_storage.update_settings(
                 library_path=library_path,
                 input_library_path=input_library_path or None,
+            )
+            saved = gallery_storage.get_settings()
+            logger.info(
+                f"[GalleryController] 保存完成，当前值: "
+                f"library_path={saved.library_path!r}, "
+                f"input_library_path={saved.input_library_path!r}"
             )
             return {"success": True}
         except Exception as e:
