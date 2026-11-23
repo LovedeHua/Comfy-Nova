@@ -555,13 +555,11 @@ export function AssetTheaterView({
           <span
             aria-hidden
             className={cn(
-              // 双层内嵌描边：外层 4px 主色 + 内层 1px 亮边，
-              // 在深色/浅色缩略图上都能立住，不依赖背景对比度。
-              'pointer-events-none absolute inset-0 rounded-md border-[4px] transition-all duration-150',
-              // 选中：4px 主色描边 + 内层 1px 亮边 + 向内的主色光晕。
+              // 内嵌描边：外层 4px 主色 + 向内的主色光晕。
               // 全部用 inset，永不越出格子，因此不会被滚动容器裁掉。
+              'pointer-events-none absolute inset-0 rounded-md border-[4px] transition-all duration-150',
               isActive
-                ? 'border-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.75),inset_0_0_12px_2px_hsl(var(--primary)/0.55)]'
+                ? 'border-primary shadow-[inset_0_0_12px_2px_hsl(var(--primary)/0.55)]'
                 : 'border-transparent'
             )}
           />
