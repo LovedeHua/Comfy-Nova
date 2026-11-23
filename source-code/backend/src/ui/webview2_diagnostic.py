@@ -129,7 +129,7 @@ def get_safe_mode_marker_path() -> Path:
     local_app_data = os.environ.get('LOCALAPPDATA')
     if local_app_data:
         return Path(local_app_data) / 'Comfy-Nova' / '.safe_mode'
-    return Path.home() / '.comfyui-box_safe_mode'
+    return Path.home() / '.comfy-nova_safe_mode'
 
 
 def is_safe_mode() -> bool:

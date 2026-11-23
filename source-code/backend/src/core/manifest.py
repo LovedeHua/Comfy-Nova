@@ -25,9 +25,13 @@ from ..utils import paths
 from ..utils.logger import app_logger as logger
 from .scope import CATEGORY_SPECS, normalize_registry
 
+# 导出包的 kind 是长期格式标识，改值会让旧导出包无法导入，保持不变。
 MANIFEST_KIND = "comfyui-box-manifest"
 SCHEMA_VERSION = 2
-SPACE_MARKER_FILENAME = ".comfyui-box-space.json"
+# 空间标记文件：新名跟随品牌，旧名（更名前写入的目录）仍需能识别，
+# 否则老用户的空间会被当成"未初始化"，丢掉已有数据。
+SPACE_MARKER_FILENAME = ".comfy-nova-space.json"
+LEGACY_SPACE_MARKER_FILENAMES = (".comfyui-box-space.json",)
 
 
 def _app_version() -> str:
@@ -71,6 +75,13 @@ def _canonical(payload: Dict[str, Any]) -> str:
 
 def _read_space_marker(space_path: Path) -> Optional[Dict[str, Any]]:
     marker = space_path / SPACE_MARKER_FILENAME
+    if not marker.exists():
+        # 兼容更名前写入的旧标记文件
+        for legacy_name in LEGACY_SPACE_MARKER_FILENAMES:
+            candidate = space_path / legacy_name
+            if candidate.exists():
+                marker = candidate
+                break
     if not marker.exists():
         return None
     data = _safe_json(marker)

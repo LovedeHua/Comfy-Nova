@@ -128,7 +128,10 @@ def test_scope_switch_private_does_not_migrate_and_epoch_changes(workspace):
 
     assert resolved["mode"] == "private"
     assert Path(resolved["path"]).parts[:3] == Path(workspace["comfy_a"]).parts[:3]
-    assert "comfyui-box" in resolved["path"]
+    # 私有空间目录名由 APP_NAME 推导（品牌更名后为 comfy-nova），
+    # 断言不再写死旧名 comfyui-box，避免品牌调整时测试假失败。
+    from backend.src.utils.paths import APP_NAME
+    assert APP_NAME.lower().replace(" ", "-") in resolved["path"]
     assert not (Path(resolved["path"]) / "assets.json").exists()
     assert legacy_assets.exists(), "切换后旧数据必须原位保留"
     assert after > before

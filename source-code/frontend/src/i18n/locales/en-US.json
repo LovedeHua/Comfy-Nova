@@ -2587,7 +2587,7 @@
       "levelPlaceholder": "Select log level",
       "fileLocation": "Log File Location",
       "fileLocationDesc": "Log files are saved in the logs folder in the project root directory",
-      "fileNameFormat": "File naming format: comfyui-box_YYYYMMDD.log",
+      "fileNameFormat": "File naming format: comfy-nova_YYYYMMDD.log",
       "autoCleanup": "Log files older than 30 days are automatically cleaned up",
       "levelDescription": "Log Level Description",
       "debugExplanation": "DEBUG: Detailed debug info including variable values, function calls, etc.",

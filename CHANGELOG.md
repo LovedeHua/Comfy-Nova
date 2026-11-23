@@ -9,6 +9,45 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.6.9
+
+> 发布日期：2026-11-23
+
+### 修复
+
+- **品牌残留 comfyui-box 清理**：更名 Comfy-Nova 后仍有若干处沿用旧名，
+  按"能否安全改名"分类处理：
+  - **旧失效路径自动纠正**：`data_spaces` 里指向 `Comfyui-Box` 且目录
+    已不存在的记录，会自动纠正为当前用户数据根。判据三条同时满足才动手
+    （带旧品牌名 + 目录不存在 + 与当前根不同），**目录真实存在的绝不改动**，
+    避免动到用户真实数据
+  - **新建私有空间目录名**由 `APP_NAME` 推导（`comfy-nova`），
+    新环境不再生成 `comfyui-box` 目录
+  - **日志文件名**前缀改为 `comfy-nova`；清理正则同时识别
+    `comfyui-box` / `comfy-box` 旧前缀，历史日志仍会被轮转清理
+  - **空间标记文件**改为 `.comfy-nova-space.json`，读取时兼容旧名
+    `.comfyui-box-space.json`，老用户空间不会被误判为未初始化
+  - 写测试探测文件、安全模式标记、导出清单文件名同步更名
+  - 界面与 i18n 的日志格式文案更新为 `comfy-nova_YYYYMMDD.log`
+
+### 保持不变（有意为之）
+
+- Bridge 协议标识 `comfyui-box:*`：与已安装在 ComfyUI 里的插件通信，
+  改名会让老插件失联
+- `comfyui-box_bridge.js` 文件名：已部署到用户 ComfyUI 目录
+- 导出包 `kind` 字段 `comfyui-box-manifest`：长期格式标识，
+  改名会让旧导出包无法导入
+- localStorage 键名：改名会丢用户现有设置
+
+### 实测
+
+- 失效 `Comfyui-Box` 路径 → 自动纠正为 Comfy-Nova 用户数据根 ✓
+- 真实存在的旧目录 → 原样保留（数据保护）✓
+- 新私有空间目录名 → `comfy-nova` ✓
+- 后端 288 passed；tsc / build 通过
+
+---
+
 ## V1.6.8
 
 > 发布日期：2026-11-23

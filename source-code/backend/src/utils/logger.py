@@ -53,7 +53,9 @@ logging.Logger.dev = dev
 
 # 常量定义
 MAX_LOG_FILE_SIZE = 100 * 1024 * 1024  # 100MB
-LOG_FILE_BASE_NAME = "comfyui-box"
+# 日志文件名前缀。品牌更名后统一为 comfy-nova；旧前缀 comfy-box/comfyui-box
+# 的历史日志仍能被清理逻辑识别（见 _LOG_FILE_PATTERNS），不会残留。
+LOG_FILE_BASE_NAME = "comfy-nova"
 
 
 def get_log_filename(base_dir: Path, current_date: Optional[datetime] = None) -> Path:
@@ -137,7 +139,10 @@ def cleanup_old_logs(log_dir: Path, keep_days: int = 30, current_date: Optional[
     import re
     # 匹配旧格式: comfyui-box_YYYYMMDD.log 或 comfyui-box_YYYYMMDD_N.log
     # 匹配新格式: comfyui-box_YYYYMMDD_HHMMSS.log 或 comfyui-box_YYYYMMDD_HHMMSS_N.log
-    log_pattern = re.compile(rf'^{LOG_FILE_BASE_NAME}_(\d{{8}})(?:_\d{{6}})?(?:_\d+)?\.log$')
+    # 旧品牌前缀的历史日志也要能被识别，否则更名后它们永远不会被清理。
+    log_pattern = re.compile(
+        rf'^(?:{LOG_FILE_BASE_NAME}|comfyui-box|comfy-box)_(\d{{8}})(?:_\d{{6}})?(?:_\d+)?\.log$'
+    )
     
     # 遍历日志目录中的所有文件
     try:
@@ -210,7 +215,10 @@ def cleanup_old_logs_by_count(log_dir: Path, keep_count: int = 10) -> int:
     
     # 匹配日志文件的正则表达式
     import re
-    log_pattern = re.compile(rf'^{LOG_FILE_BASE_NAME}_(\d{{8}})(?:_\d{{6}})?(?:_\d+)?\.log$')
+    # 旧品牌前缀的历史日志也要能被识别，否则更名后它们永远不会被清理。
+    log_pattern = re.compile(
+        rf'^(?:{LOG_FILE_BASE_NAME}|comfyui-box|comfy-box)_(\d{{8}})(?:_\d{{6}})?(?:_\d+)?\.log$'
+    )
     
     # 收集所有匹配的日志文件
     log_files = []

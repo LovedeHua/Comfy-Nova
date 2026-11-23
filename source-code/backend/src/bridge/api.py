@@ -8017,7 +8017,7 @@ class Api:
                 "success": True,
                 "manifest": manifest,
                 "json": json.dumps(manifest, ensure_ascii=False, indent=2),
-                "suggested_filename": f"comfyui-box-manifest-{manifest.get('app_version', 'unknown')}.json",
+                "suggested_filename": f"comfy-nova-manifest-{manifest.get('app_version', 'unknown')}.json",
             }
         except Exception as exc:
             logger.error("[manifest] 导出失败: %s", exc, exc_info=True)

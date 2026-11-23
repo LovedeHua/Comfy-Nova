@@ -256,7 +256,7 @@ def _validate_root(path_value: str) -> Path:
     if target == paths.get_project_root().resolve():
         raise ValueError("数据目录不能是项目安装目录本身")
     target.mkdir(parents=True, exist_ok=True)
-    probe = target / ".comfyui-box-write-test"
+    probe = target / ".comfy-nova-write-test"
     try:
         probe.write_text("ok", encoding="utf-8")
         probe.unlink()
@@ -397,7 +397,7 @@ def set_runtime_data_root(path_value: str) -> Dict[str, Any]:
             value = ""
         else:
             target.mkdir(parents=True, exist_ok=True)
-            probe = target / ".comfyui-box-write-test"
+            probe = target / ".comfy-nova-write-test"
             try:
                 probe.write_text("ok", encoding="utf-8")
                 probe.unlink()

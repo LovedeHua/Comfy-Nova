@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ...utils.logger import app_logger as logger
+from ...utils.paths import APP_NAME
 
 # 每类业务数据的物理子路径（相对数据空间根）。
 CATEGORY_SPECS: Dict[str, Dict[str, Any]] = {
@@ -133,11 +134,14 @@ def _root_private_path(env: Dict[str, Any]) -> str:
     """计算某根默认私有数据空间路径（只计算，不创建、不迁移）。"""
     env_type = str(env.get("env_type") or env.get("envType") or "portable")
     desktop_path = env.get("desktop_data_path") or env.get("desktopDataPath")
+    # 目录名由 APP_NAME 推导（当前为 Comfy-Nova），避免品牌更名后
+    # 新环境仍然生成 comfyui-box 这样的旧目录名。
+    private_dir_name = APP_NAME.lower().replace(" ", "-")
     if env_type == "desktop" and desktop_path:
-        return str(Path(str(desktop_path)) / "comfyui-box")
+        return str(Path(str(desktop_path)) / private_dir_name)
     comfy_path = env.get("path")
     if comfy_path:
-        return str(Path(str(comfy_path)) / "user" / "comfyui-box")
+        return str(Path(str(comfy_path)) / "user" / private_dir_name)
     return str(_user_root() / "spaces" / _root_id(env))
 
 
@@ -171,6 +175,29 @@ def normalize_registry(config: Dict[str, Any]) -> bool:
         }
         spaces.append(legacy_space)
         changed = True
+    else:
+        # 品牌更名（Comfyui-Box → Comfy-Nova）前写入的旧路径可能已失效。
+        #
+        # 判据必须同时满足三条，缺一不可：
+        #   1. 路径里带旧品牌目录名（comfyui-box），说明是更名前的产物；
+        #   2. 该目录确实不存在（失效）；
+        #   3. 与当前用户数据根不同。
+        # 只看"目录不存在"会误伤用户的真实配置（例如指向一块尚未挂载的
+        # 磁盘、或用户故意配置的空目录），那种情况必须原样保留。
+        legacy_path = str(legacy_space.get("path") or "")
+        is_old_brand_path = "comfyui-box" in legacy_path.lower().replace("_", "-")
+        if (
+            legacy_path
+            and legacy_path != user_root
+            and is_old_brand_path
+            and not Path(legacy_path).exists()
+        ):
+            logger.info(
+                f"[ScopeResolver] 旧品牌全局空间路径已失效，纠正为当前用户数据根: "
+                f"{legacy_path} → {user_root}"
+            )
+            legacy_space["path"] = user_root
+            changed = True
 
     if not packages:
         packages = [
