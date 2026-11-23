@@ -331,12 +331,26 @@ class GalleryController:
             }
         """
         try:
+            settings = gallery_storage.get_settings()
+            configured_path = settings.library_path
             if library_path is None:
-                settings = gallery_storage.get_settings()
-                library_path = settings.library_path
+                library_path = configured_path
 
             if not library_path:
                 return {"success": False, "error_message": "未配置资产库路径"}
+
+            # 只有【切换到不同的输出目录】时才清理旧的生成图记录。
+            # 同一目录重复全量扫描不做预清理：scan_library 内部按"扫描到的
+            # 文件差集"删除，避免扫描异常导致资产被成批误删（真实事故）。
+            path_changed = bool(
+                configured_path and Path(configured_path) != Path(library_path)
+            )
+            if path_changed:
+                logger.info(
+                    f"[GalleryController] 输出目录变更，清理旧生成图记录: "
+                    f"{configured_path} → {library_path}"
+                )
+                gallery_storage.clear_generated_data()
 
             result = gallery_scanner.scan_library(library_path)
             result["success"] = True

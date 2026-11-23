@@ -177,12 +177,12 @@ class GalleryScanner:
 
         self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
 
-        # 清理旧数据（切换目录时需要清理之前的资产和分类）。
-        # 只清生成图（source=generated），输入图（source=input）是独立库，不能被波及
-        gallery_storage.clear_generated_data()
-
         self._sync_categories_from_folders(library_dir, source="generated")
 
+        # 不要在这里 clear_generated_data()：那是"先删后建"，一旦本次扫描
+        # 因目录不可读、权限、异常等任何原因没扫到文件，已有资产就已经被
+        # 永久删掉且没有备份（真实事故：4716 条输出图资产被清空）。
+        # 改为"扫描完成后按差集删除"——只有确认磁盘上确实不存在的才删。
         existing_assets = {a.file_path: a for a in gallery_storage.get_assets() if a.source == "generated"}
         found_files = {}
         errors = []
@@ -237,10 +237,20 @@ class GalleryScanner:
                     errors.append(error_msg)
 
             removed_count = 0
-            for file_path_str in existing_assets:
-                if file_path_str not in found_files:
-                    gallery_storage.delete_asset(existing_assets[file_path_str].id)
-                    removed_count += 1
+            # 安全阀：本次一个文件都没扫到，却要删掉全部已有资产时，
+            # 几乎一定是目录不可读/未挂载/路径写错，而不是用户真的清空了库。
+            # 这种情况下保持原数据不动，把原因作为错误返回给用户判断。
+            scanned_nothing = len(found_files) == 0 and len(existing_assets) > 0
+            if scanned_nothing:
+                errors.append(
+                    f"未在 {library_dir} 下扫描到任何文件，已保留原有 "
+                    f"{len(existing_assets)} 条资产记录（未做删除）"
+                )
+            else:
+                for file_path_str in existing_assets:
+                    if file_path_str not in found_files:
+                        gallery_storage.delete_asset(existing_assets[file_path_str].id)
+                        removed_count += 1
 
         gallery_storage.update_settings(last_scan_time=datetime.now().isoformat())
 
@@ -474,14 +484,28 @@ class GalleryScanner:
             except Exception as exc:
                 errors.append(f"{file_path.name}: {exc}")
 
-        # 删除磁盘上已不存在的输入图记录
-        for existing in existing_assets.values():
-            if existing.source != "input":
-                continue
-            rel = str(Path(existing.file_path).relative_to(library_dir)).replace("\\", "/")
-            if rel not in found_files:
-                gallery_storage.delete_asset(existing.id)
-                removed_count += 1
+        # 删除磁盘上已不存在的输入图记录。
+        # 与输出库同样的安全阀：一个文件都没扫到却要清空全部输入资产，
+        # 通常是目录不可读/未挂载，不是用户真的清空了库。
+        scanned_nothing = len(found_files) == 0 and len(existing_assets) > 0
+        if scanned_nothing:
+            errors.append(
+                f"未在 {library_dir} 下扫描到任何文件，已保留原有 "
+                f"{len(existing_assets)} 条输入资产记录（未做删除）"
+            )
+        else:
+            for existing in existing_assets.values():
+                if existing.source != "input":
+                    continue
+                try:
+                    rel = str(Path(existing.file_path).relative_to(library_dir)).replace("\\", "/")
+                except ValueError:
+                    # 记录的文件路径已不在当前库目录下（切换过库），
+                    # 无法相对化就跳过，不要误删。
+                    continue
+                if rel not in found_files:
+                    gallery_storage.delete_asset(existing.id)
+                    removed_count += 1
 
         gallery_storage.update_settings(last_scan_time=datetime.now().isoformat())
 
