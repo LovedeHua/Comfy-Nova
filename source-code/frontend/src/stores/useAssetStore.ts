@@ -109,6 +109,8 @@ interface AssetStore {
   refreshCategories: () => Promise<void>
   scanLibrary: () => Promise<{ success: boolean; added?: number; updated?: number; removed?: number }>
   incrementalScanLibrary: () => Promise<{ success: boolean; added?: number; updated?: number; removed?: number }>
+  /** 扫描输入图片库（与生成图库隔离），完成后刷新数据 */
+  scanInputLibrary: () => Promise<{ success: boolean; added?: number; updated?: number; removed?: number; error_message?: string }>
   startBackgroundScan: (libraryPath?: string) => Promise<{ success: boolean; message?: string }>
   getScanStatus: () => Promise<{ success: boolean; scanning?: boolean; stopping?: boolean; progress?: ScanProgress | null }>
   stopScan: () => Promise<boolean>
@@ -456,6 +458,31 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       console.error('[useAssetStore] 增量扫描异常:', error)
       set({ isScanning: false, error: i18n.t('asset.error.scanException', { error: String(error) }) })
       return { success: false }
+    }
+  },
+
+  scanInputLibrary: async () => {
+    console.log('[useAssetStore] 扫描输入图片库')
+    set({ isScanning: true, error: null })
+    try {
+      const result = await window.pywebview.api.gallery_scan_input()
+      set({ isScanning: false })
+      if (result.success) {
+        // 扫完立即刷新：输入图资产才会出现在界面上
+        await get().loadData()
+        return {
+          success: true,
+          added: result.added,
+          updated: result.updated,
+          removed: result.removed
+        }
+      }
+      set({ error: result.error_message || '输入库扫描失败' })
+      return { success: false, error_message: result.error_message }
+    } catch (error) {
+      console.error('[useAssetStore] 输入库扫描异常:', error)
+      set({ isScanning: false, error: String(error) })
+      return { success: false, error_message: String(error) }
     }
   },
 

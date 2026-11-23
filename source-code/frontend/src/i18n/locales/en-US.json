@@ -4066,7 +4066,8 @@
       "saveError": "Failed to save settings",
       "inputLibraryPath": "Input Images Path",
       "inputPathPlaceholder": "e.g. E:\\ComfyUI\\input",
-      "inputPathHint": "Manage input assets (reference images, etc.) separately from the generated library"
+      "inputPathHint": "Manage input assets (reference images, etc.) separately from the generated library",
+      "inputScanFailed": "Input library scan failed, please check the path"
     },
     "thumbnailSizeValue": "{size}px",
     "noAssets": "No assets",

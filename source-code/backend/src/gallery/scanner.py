@@ -179,7 +179,7 @@ class GalleryScanner:
 
         self._sync_categories_from_folders(library_dir)
 
-        existing_assets = {a.file_path: a for a in gallery_storage.get_assets()}
+        existing_assets = {a.file_path: a for a in gallery_storage.get_assets() if a.source == "generated"}
         found_files = {}
         errors = []
         added_count = 0
@@ -287,7 +287,9 @@ class GalleryScanner:
 
         self._sync_categories_from_folders(library_dir)
 
-        existing_assets = {a.file_path: a for a in gallery_storage.get_assets()}
+        # 只处理生成图库资产；输入图库（source=input）由 scan_input_library 独立管理，
+        # 绝不能被生成库扫描当作"已删除"清掉——这是两库串数据的关键隔离点。
+        existing_assets = {a.file_path: a for a in gallery_storage.get_assets() if a.source == "generated"}
         found_files = {}
         errors = []
         added_count = 0
@@ -409,8 +411,8 @@ class GalleryScanner:
         input_thumbs = self._thumbnails_dir / "input"
         input_thumbs.mkdir(parents=True, exist_ok=True)
 
-        gallery_storage.clear_input_data()
-
+        # 不用 clear_input_data()：它会先把旧记录抹掉，导致下面的删除检测永远失效。
+        # 改用与增量扫描一致的"快照对比"策略：已有则更新、缺失则删除，天然幂等。
         existing_assets = {a.file_path: a for a in gallery_storage.get_assets() if a.source == "input"}
         found_files = {}
         errors = []
@@ -433,7 +435,10 @@ class GalleryScanner:
                 stat = file_path.stat()
                 existing = existing_assets.get(str(file_path))
                 if existing is not None:
-                    if existing.size == stat.st_size and existing.thumbnail_path:
+                    # 用 ctime+size 判断是否变化（与生成库一致）；
+                    # 不能用 thumbnail_path 判据——缩略图由后台线程异步补，
+                    # 重扫时可能还没补上，会导致每次都误判为"需更新"。
+                    if not self._needs_update(existing, file_path):
                         found_files[relative] = existing
                         continue
                     self._update_asset(existing, file_path)

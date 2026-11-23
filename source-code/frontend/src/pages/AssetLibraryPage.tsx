@@ -18,8 +18,7 @@ import {
   ScanProgressBar,
   AssetInfoPanel,
   AssetDragProvider,
-  AssetDragLayer,
-  AssetSelectionBox
+  AssetDragLayer
 } from '@/components/asset'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Button } from '@/components/ui/Button'
@@ -73,7 +72,6 @@ export default function AssetLibraryPage() {
     assets,
     selectedCategoryId,
     setSelectedCategoryId,
-    setBatchMode,
     categories,
     createCategory,
     updateCategory,
@@ -115,10 +113,6 @@ export default function AssetLibraryPage() {
   }, [])
 
   const [isSelecting, setIsSelecting] = useState(false)
-  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null)
-  const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null)
-  const selectionStartRef = useRef<{ x: number; y: number } | null>(null)
-  const isSelectingRef = useRef(false)
 
   const gridRef = useRef<AssetMasonryGridRef>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -206,107 +200,150 @@ export default function AssetLibraryPage() {
   const infoPanelInFlow = infoPanelPinned && !theaterAsset
   const infoPanelShown = !theaterAsset && (infoPanelPinned || !!selectedInfoAsset)
 
-  const getIntersectingCardIds = useCallback((
-    start: { x: number; y: number },
-    end: { x: number; y: number }
-  ): string[] => {
-    const selectionRect = {
-      left: Math.min(start.x, end.x),
-      right: Math.max(start.x, end.x),
-      top: Math.min(start.y, end.y),
-      bottom: Math.max(start.y, end.y)
-    }
+  // 卡片矩形快照：只在框选开始时读一次 getBoundingClientRect。
+  // 之前每次 mousemove 都遍历所有卡片调 getBoundingClientRect，会强制同步布局；
+  // 几千张卡片时每帧数千次 reflow，直接卡死、框选失效。
+  interface CardRect { id: string; left: number; top: number; right: number; bottom: number }
+  const cardRectsRef = useRef<CardRect[]>([])
+  const selectionStartRef2 = useRef<{ x: number; y: number } | null>(null)
+  const isSelectingRef2 = useRef(false)
+  const rafRef = useRef<number | null>(null)
+  const pendingSelectionEndRef = useRef<{ x: number; y: number } | null>(null)
+  const baseSelectedIdsRef = useRef<Set<string>>(new Set())
+  const selectionBoxRef = useRef<HTMLDivElement | null>(null)
 
-    const intersectingIds: string[] = []
-    const cardRefs = gridRef.current?.getCardRefs() ?? new Map()
-
-    cardRefs.forEach((cardEl, assetId) => {
-      const cardRect = cardEl.getBoundingClientRect()
-
-      if (
-        cardRect.left < selectionRect.right &&
-        cardRect.right > selectionRect.left &&
-        cardRect.top < selectionRect.bottom &&
-        cardRect.bottom > selectionRect.top
-      ) {
-        intersectingIds.push(assetId)
-      }
-    })
-
-    return intersectingIds
+  const updateSelectionBox = useCallback((start: { x: number; y: number }, end: { x: number; y: number }) => {
+    const el = selectionBoxRef.current
+    if (!el) return
+    const left = Math.min(start.x, end.x)
+    const top = Math.min(start.y, end.y)
+    const width = Math.abs(end.x - start.x)
+    const height = Math.abs(end.y - start.y)
+    el.style.display = width < 5 && height < 5 ? 'none' : 'block'
+    el.style.left = left + 'px'
+    el.style.top = top + 'px'
+    el.style.width = width + 'px'
+    el.style.height = height + 'px'
   }, [])
 
   const handleSelectionMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return
+    if (theaterAsset) return
     if ((e.target as HTMLElement).closest('[data-asset-card]')) return
     if ((e.target as HTMLElement).closest('[data-folder-card]')) return
     if ((e.target as HTMLElement).closest('button')) return
+    if ((e.target as HTMLElement).closest('[data-info-panel]')) return
+
+    // 一次性快照所有可见卡片的矩形（只读一次，后续 mousemove 纯数学计算）
+    const rects: CardRect[] = []
+    gridRef.current?.getCardRefs().forEach((cardEl, assetId) => {
+      const r = cardEl.getBoundingClientRect()
+      // content-visibility 跳过的卡片矩形为 0，跳过它们
+      if (r.width <= 0 || r.height <= 0) return
+      rects.push({ id: assetId, left: r.left, top: r.top, right: r.right, bottom: r.bottom })
+    })
+    cardRectsRef.current = rects
 
     const point = { x: e.clientX, y: e.clientY }
-    
+    selectionStartRef2.current = point
+    isSelectingRef2.current = true
+    hasDraggedRef.current = false
+    baseSelectedIdsRef.current = new Set(useAssetStore.getState().selectedAssetIds)
+    blankClickFlagsRef.current = {
+      wasBatchMode: useAssetStore.getState().isBatchMode,
+      closeInfo: !infoPanelPinned && !!selectedInfoAsset
+    }
+    pendingSelectionEndRef.current = null
+    // 选区框用 ref 挂载，避免 setState 引发整页重渲染
     setIsSelecting(true)
-    setSelectionStart(point)
-    setSelectionEnd(point)
-    selectionStartRef.current = point
-    isSelectingRef.current = true
-  }, [])
-
+  }, [theaterAsset, infoPanelPinned, selectedInfoAsset])
+  // 框选期间：mousemove 只更新选区框 DOM，选中态用 rAF 节流提交
   useEffect(() => {
     if (!isSelecting) return
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isSelectingRef.current || !selectionStartRef.current) return
+    const commitSelection = () => {
+      rafRef.current = null
+      const start = selectionStartRef2.current
+      const end = pendingSelectionEndRef.current
+      if (!start || !end) return
+      const left = Math.min(start.x, end.x)
+      const right = Math.max(start.x, end.x)
+      const top = Math.min(start.y, end.y)
+      const bottom = Math.max(start.y, end.y)
 
-      // 拖动超过阈值：本次按下属于框选，松开的 click 不应触发"点空白退出批量"
-      const dragDx = e.clientX - selectionStartRef.current.x
-      const dragDy = e.clientY - selectionStartRef.current.y
-      if (Math.abs(dragDx) > 3 || Math.abs(dragDy) > 3) hasDraggedRef.current = true
-
-      setSelectionEnd({ x: e.clientX, y: e.clientY })
-
-      const intersectingIds = getIntersectingCardIds(selectionStartRef.current, { x: e.clientX, y: e.clientY })
-      
-      if (intersectingIds.length > 0 && !isBatchMode) {
-        setBatchMode(true)
+      const ids = new Set(baseSelectedIdsRef.current)
+      for (const r of cardRectsRef.current) {
+        if (r.left < right && r.right > left && r.top < bottom && r.bottom > top) {
+          ids.add(r.id)
+        }
       }
-      
-      useAssetStore.setState(state => {
-        const newIds = new Set(state.selectedAssetIds)
-        intersectingIds.forEach(id => newIds.add(id))
-        return { selectedAssetIds: Array.from(newIds) }
-      })
+      const store = useAssetStore.getState()
+      if (ids.size > 0 && !store.isBatchMode) store.setBatchMode(true)
+      // 只在结果变化时提交，避免无谓渲染
+      if (ids.size !== store.selectedAssetIds.length ||
+          Array.from(ids).some(id => !store.selectedAssetIds.includes(id))) {
+        useAssetStore.setState({ selectedAssetIds: Array.from(ids) })
+      }
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const start = selectionStartRef2.current
+      if (!isSelectingRef2.current || !start) return
+      const dx = e.clientX - start.x
+      const dy = e.clientY - start.y
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDraggedRef.current = true
+
+      const end = { x: e.clientX, y: e.clientY }
+      pendingSelectionEndRef.current = end
+      updateSelectionBox(start, end)  // DOM 直写，零 React 渲染
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame(commitSelection)
     }
 
     const handleMouseUp = () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+        commitSelection()
+      }
+      // 未拖动 = 单击空白：退出批量管理 / 关闭 info 面板。
+      // 放在 mousedown/mouseup 配对里，网格视图与瀑布流一致，不依赖 click 冒泡。
+      if (!hasDraggedRef.current) {
+        const flags = blankClickFlagsRef.current
+        if (flags.wasBatchMode) {
+          useAssetStore.getState().setBatchMode(false)
+          useAssetStore.getState().clearSelection()
+        } else if (flags.closeInfo) {
+          setSelectedInfoAsset(null)
+        }
+      }
+      isSelectingRef2.current = false
+      selectionStartRef2.current = null
+      pendingSelectionEndRef.current = null
+      cardRectsRef.current = []
+      if (selectionBoxRef.current) selectionBoxRef.current.style.display = 'none'
       setIsSelecting(false)
-      setSelectionStart(null)
-      setSelectionEnd(null)
-      isSelectingRef.current = false
-      selectionStartRef.current = null
     }
 
-    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mousemove', handleMouseMove, { passive: true })
     document.addEventListener('mouseup', handleMouseUp)
-
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     }
-  }, [isSelecting, getIntersectingCardIds, isBatchMode, setBatchMode])
+  }, [isSelecting, updateSelectionBox])
 
+  // Esc 取消框选
   useEffect(() => {
     if (!isSelecting) return
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        isSelectingRef2.current = false
+        selectionStartRef2.current = null
+        if (selectionBoxRef.current) selectionBoxRef.current.style.display = 'none'
         setIsSelecting(false)
-        setSelectionStart(null)
-        setSelectionEnd(null)
-        isSelectingRef.current = false
-        selectionStartRef.current = null
       }
     }
-
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isSelecting])
@@ -502,33 +539,30 @@ export default function AssetLibraryPage() {
   // 框选拖动标记：mousedown 后鼠标实际移动过（超过阈值）置 true，
   // 框选松开触发的 click 据此跳过"点空白退出批量"，避免框选完自动退出。
   const hasDraggedRef = useRef(false)
+  // 空白单击退出所需的标志：在 mousedown 时刻快照，mouseup 判定未拖动时使用。
+  // 这样"点空白退出批量"完全走滚动容器的 mousedown/mouseup 配对，
+  // 不依赖 click 冒泡——网格视图(react-window)与瀑布流行为一致。
+  const blankClickFlagsRef = useRef({ wasBatchMode: false, closeInfo: false })
 
-  // 点击页面空白区域：批量模式下退出批量管理（并清空选择）；
-  // 非批量下关闭悬浮 info 面板。
+  // 卡片列表区域的空白单击退出批量/关 info 面板已统一放到滚动容器的
+  // mousedown/mouseup 配对里处理（见 handleSelectionMouseDown / handleMouseUp），
+  // 这样网格视图(react-window)与瀑布流行为一致，不依赖 click 冒泡时序。
+  // 这里只处理"点击在工具栏/标签栏等列表之外的空白"：关闭 info 面板。
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (theaterAsset) return
-    // 框选拖动后的松开不算"点空白"
-    if (hasDraggedRef.current) {
-      hasDraggedRef.current = false
-      return
-    }
     const target = e.target as HTMLElement
-    // 不视为"空白"：点击在 info 面板内、卡片上、文件夹卡片上、或任何按钮上
+    // 列表内的空白由 mousedown/mouseup 负责，跳过以免重复触发
+    if (target.closest('[data-asset-scroll-container]')) return
     if (
       target.closest('[data-info-panel]') ||
       target.closest('[data-asset-card]') ||
       target.closest('[data-folder-card]') ||
       target.closest('button')
     ) return
-    if (isBatchMode) {
-      setBatchMode(false)
-      clearSelection()
-      return
-    }
     if (!infoPanelPinned && selectedInfoAsset) {
       setSelectedInfoAsset(null)
     }
-  }, [isBatchMode, setBatchMode, clearSelection, infoPanelPinned, selectedInfoAsset, theaterAsset])
+  }, [infoPanelPinned, selectedInfoAsset, theaterAsset])
 
   return (
     <AssetDragProvider onDrop={handleDropToCategory}>
@@ -584,6 +618,7 @@ export default function AssetLibraryPage() {
           <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <div
               ref={scrollContainerRef}
+              data-asset-scroll-container
               className={cn(
                 'min-w-0 flex-1 bg-background',
                 viewMode === 'grid' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'
@@ -722,9 +757,10 @@ export default function AssetLibraryPage() {
 
         <AssetDragLayer getCardRefs={getCardRefs} />
 
-        {isSelecting && selectionStart && selectionEnd && (
-          <AssetSelectionBox startPoint={selectionStart} endPoint={selectionEnd} />
-        )}
+        <div
+          ref={selectionBoxRef}
+          className="pointer-events-none fixed z-50 hidden border-2 border-dashed border-primary bg-primary/10"
+        />
       </div>
     </AssetDragProvider>
   )

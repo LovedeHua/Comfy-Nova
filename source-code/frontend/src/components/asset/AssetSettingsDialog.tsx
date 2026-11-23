@@ -30,7 +30,8 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
   const { t } = useTranslation()
   const {
     getSettings,
-    saveSettings, 
+    saveSettings,
+    scanInputLibrary,
     startBackgroundScan,
     getNsfwStatus,
     setNsfwEnabled,
@@ -139,9 +140,12 @@ export function AssetSettingsDialog({ open, onOpenChange }: AssetSettingsDialogP
         onOpenChange(false)
         console.log('[AssetSettingsDialog] 启动后台扫描...')
         startBackgroundScan(libraryPath.trim())
-        // 输入库路径已配置时同步扫描（与生成图库分开管理）
+        // 输入库路径已配置时扫描并刷新（与生成图库分开管理）
         if (inputLibraryPath.trim()) {
-          window.pywebview?.api?.gallery_scan_input?.(inputLibraryPath.trim())
+          const inputResult = await scanInputLibrary()
+          if (!inputResult.success) {
+            showToast(inputResult.error_message || t('asset.settingsDialog.inputScanFailed'), 'warning')
+          }
         }
       } else {
         showToast(t('asset.settingsDialog.saveError'), 'error')
