@@ -114,7 +114,13 @@ export function CacheManagement() {
         return
       }
 
-      const result = await window.pywebview.api.clear_all_caches()
+      // 缩略图不在通用缓存体系里，需单独清理一次，否则"一键清理"会漏掉
+      const [result] = await Promise.all([
+        window.pywebview.api.clear_all_caches(),
+        (thumbStats?.file_count ?? 0) > 0
+          ? window.pywebview.api.gallery_clear_thumbnails()
+          : Promise.resolve(null)
+      ])
       if (result.success && result.data) {
         const clearedSize = result.data.total_cleared_size_formatted
         toast.success(t('settings.cache.clearAllSuccess', { size: clearedSize }))
@@ -273,21 +279,18 @@ export function CacheManagement() {
             </CardContent>
           </Card>
         ))}
-      </div>
 
-      {/* 资产库缩略图缓存：独立于上面的通用缓存体系（存在资产数据目录） */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ImageIcon className="size-4 text-primary" />
-            {t('settings.cache.thumbnails.title')}
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.cache.thumbnails.description')}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        {/* 资产库缩略图缓存：不属于通用缓存体系（存在资产数据目录），
+            但同样以卡片形式排在网格里，补满一行三列的空位 */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ImageIcon className="size-4 text-primary" />
+              {t('settings.cache.thumbnails.title')}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">{t('settings.cache.thumbnails.description')}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
             <div className="flex items-center gap-2">
               <HardDrive className="size-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">{t('settings.cache.size')}:</span>
@@ -298,50 +301,53 @@ export function CacheManagement() {
               <span className="text-sm text-muted-foreground">{t('settings.cache.fileCount')}:</span>
               <span className="font-medium">{thumbStats?.file_count ?? 0}</span>
             </div>
-          </div>
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={clearingThumbs || (thumbStats?.file_count ?? 0) === 0}
-              >
-                {clearingThumbs ? (
-                  <RefreshCw className="mr-2 size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 size-4" />
-                )}
-                {t('settings.cache.thumbnails.clear')}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t('settings.cache.thumbnails.confirmTitle')}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {t('settings.cache.thumbnails.confirmDescription')}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearThumbnails}>
-                  {t('common.confirm')}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardContent>
-      </Card>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={clearingThumbs || (thumbStats?.file_count ?? 0) === 0}
+                >
+                  {clearingThumbs ? (
+                    <RefreshCw className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 size-4" />
+                  )}
+                  {t('settings.cache.thumbnails.clear')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('settings.cache.thumbnails.confirmTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('settings.cache.thumbnails.confirmDescription')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearThumbnails}>
+                    {t('common.confirm')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* 总计和一键清理 */}
       <Card>
         <CardContent className="flex items-center justify-between py-4">
           <div>
             <div className="text-sm text-muted-foreground">{t('settings.cache.totalSize')}</div>
-            <div className="text-2xl font-bold">{stats.total_size_formatted}</div>
+            <div className="text-2xl font-bold">
+              {formatSize(stats.total_size_bytes + (thumbStats?.size_bytes ?? 0))}
+            </div>
             <div className="text-xs text-muted-foreground">
-              {t('settings.cache.totalFiles', { count: stats.total_file_count })}
+              {t('settings.cache.totalFiles', {
+                count: stats.total_file_count + (thumbStats?.file_count ?? 0)
+              })}
             </div>
           </div>
 
@@ -349,7 +355,10 @@ export function CacheManagement() {
             <AlertDialogTrigger asChild>
               <Button
                 variant="destructive"
-                disabled={clearingAll || stats.total_size_bytes === 0}
+                disabled={
+                  clearingAll ||
+                  (stats.total_size_bytes === 0 && (thumbStats?.file_count ?? 0) === 0)
+                }
               >
                 {clearingAll ? (
                   <RefreshCw className="mr-2 size-4 animate-spin" />
