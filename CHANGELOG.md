@@ -9,6 +9,32 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.7.7
+
+> 发布日期：2026-11-23
+
+### 修复
+
+- **「浏览」按钮的文件夹对话框定位失败**：调用 `create_file_dialog` 时
+  未传 `directory`，pywebview 回落到 `os.environ['HOMEPATH']`——该值形如
+  `\Users\dsypk`，**不含盘符**。在 E: 盘工作目录下会被
+  `os.path.abspath` 解析成 `E:\Users\dsypk`（不存在的路径），
+  对话框初始目录因此定位失败（日志报
+  `initialDirectory 不存在: \Users\dsypk (abs=E:\Users\dsypk)`）。
+  两层修复：
+  1. `browse_folder` 显式传入 `_default_browse_directory()`
+     （用户主目录的绝对路径，含盘符），彻底避开 pywebview 的 HOMEPATH 回退
+  2. `OpenFolderDialog` 的 `abspath` 兜底：遇到缺盘符的 `\\xxx` 路径时
+     按 `SystemDrive` 补全，不再被解析到当前工作盘
+
+### 实测
+
+- 默认浏览目录：`C:\Users\dsypk`（绝对路径、目录存在）✓
+- 对照：旧逻辑把 `\Users\dsypk` 解析为 `E:\Users\dsypk`（错误盘符）
+- 后端 288 passed
+
+---
+
 ## V1.7.6
 
 > 发布日期：2026-11-23

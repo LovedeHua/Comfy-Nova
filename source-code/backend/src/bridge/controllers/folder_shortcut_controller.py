@@ -374,6 +374,23 @@ class FolderShortcutController:
                 "error_message": f"验证路径时发生错误: {str(e)}"
             }
     
+    @staticmethod
+    def _default_browse_directory() -> str:
+        """返回对话框的初始目录（绝对路径、含盘符）。
+
+        优先用户主目录，其次系统盘根。必须是绝对路径——pywebview 在未提供
+        directory 时会用 HOMEPATH（"\\Users\\x"，无盘符），多盘符机器上
+        会被解析到错误磁盘。
+        """
+        import os
+        from pathlib import Path
+
+        home = Path(os.path.expanduser("~"))
+        if home.is_absolute() and home.is_dir():
+            return str(home)
+        system_drive = os.environ.get("SystemDrive", "C:")
+        return os.path.join(system_drive, os.sep)
+
     def browse_folder(self, window=None) -> Dict:
         """
         打开系统文件夹选择器
@@ -394,8 +411,14 @@ class FolderShortcutController:
                 logger.debug(f"[browse_folder] 开始调用文件对话框...")
                 start_time = time.time()
                 
+                # 显式传初始目录：不传时 pywebview 会回落到 os.environ['HOMEPATH']，
+                # 而 HOMEPATH 形如 "\Users\x"（不含盘符），在 E: 盘工作目录下会被
+                # 解析成 E:\Users\x —— 不存在的路径，对话框因此定位失败。
+                # 这里传完整路径（含盘符）彻底避开该缺陷。
+                start_directory = self._default_browse_directory()
                 result = window.create_file_dialog(
                     dialog_type=webview.FileDialog.FOLDER,
+                    directory=start_directory,
                     allow_multiple=False
                 )
                 

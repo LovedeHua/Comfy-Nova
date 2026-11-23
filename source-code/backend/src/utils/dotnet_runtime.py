@@ -663,7 +663,13 @@ def _apply_winforms_monkey_patches() -> None:
                         dialog = wf.WinForms.FolderBrowserDialog()
                         if initialDirectory:
                             import os
-                            abs_dir = os.path.abspath(initialDirectory)
+                            # 不能直接用 os.path.abspath：形如 "\Users\x" 的路径缺少盘符，
+                            # 在 E: 盘工作目录下会被解析成 E:\Users\x（错误盘符），初始目录
+                            # 被判定为不存在。缺盘符时按系统盘补全。
+                            raw_dir = str(initialDirectory)
+                            if raw_dir.startswith("\\") and not raw_dir.startswith("\\\\"):
+                                raw_dir = os.environ.get("SystemDrive", "C:") + raw_dir
+                            abs_dir = os.path.abspath(raw_dir)
                             if os.path.isdir(abs_dir):
                                 dialog.SelectedPath = abs_dir
                                 _logger.info(f"[OpenFolderDialog.show] SelectedPath={abs_dir}")
