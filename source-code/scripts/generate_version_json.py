@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-REPO_OWNER = "qiqStrong"
+REPO_OWNER = "LovedeHua"
 REPO_NAME = "Comfy-Nova"
 
 def get_proxy_from_settings():

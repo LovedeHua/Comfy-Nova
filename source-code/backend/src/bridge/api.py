@@ -3856,7 +3856,7 @@ class Api:
             logger.dev(f"[API] 获取代理配置失败: {e}")
             return None
 
-    def get_github_releases(self, owner: str = "qiqStrong", repo: str = "Comfy-Nova", per_page: int = 3):
+    def get_github_releases(self, owner: str = "LovedeHua", repo: str = "Comfy-Nova", per_page: int = 3):
         """
         获取 GitHub 仓库的 Releases 列表（通过镜像代理）
         

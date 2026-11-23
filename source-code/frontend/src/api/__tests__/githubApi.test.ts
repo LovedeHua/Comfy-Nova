@@ -27,7 +27,7 @@ function makeRelease(tag: string, publishedAt: string, name = tag): Release {
     name,
     body: `${name} 的更新内容`,
     published_at: publishedAt,
-    html_url: 'https://github.com/qiqStrong/Comfy-Nova/releases',
+    html_url: 'https://github.com/LovedeHua/Comfy-Nova/releases',
     prerelease: false,
     draft: false
   }

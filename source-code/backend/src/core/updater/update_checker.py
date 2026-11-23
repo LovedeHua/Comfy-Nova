@@ -13,7 +13,7 @@ from backend.src.utils.logger import app_logger as logger
 class UpdateChecker:
     """版本检查器"""
     
-    VERSION_JSON_URL = "https://raw.githubusercontent.com/qiqStrong/Comfy-Nova/main/version.json"
+    VERSION_JSON_URL = "https://raw.githubusercontent.com/LovedeHua/Comfy-Nova/main/version.json"
     REQUEST_TIMEOUT = 15
     
     def __init__(self, settings_manager=None):
@@ -68,7 +68,7 @@ class UpdateChecker:
         更新源指向别处。
 
         支持格式: https://<token>@github.com/<owner>/<repo>
-        例如: https://ghp_xxxx@github.com/qiqStrong/Comfy-Nova_VM
+        例如: https://ghp_xxxx@github.com/LovedeHua/Comfy-Nova_VM
         """
         from backend.src.core import deploy_env
 

@@ -53,7 +53,7 @@ const isDev = import.meta.env.DEV
 const DEV_UPDATE_INFO: UpdateInfo = {
   currentVersion: 'V1.0.0',
   latestVersion: 'V1.0.1',
-  downloadUrl: 'https://github.com/qiqStrong/Comfy-Nova/releases/latest',
+  downloadUrl: 'https://github.com/LovedeHua/Comfy-Nova/releases/latest',
   releaseNotes: '开发环境模拟更新',
   publishedAt: new Date().toISOString(),
   fileSize: 1024 * 1024 * 50,

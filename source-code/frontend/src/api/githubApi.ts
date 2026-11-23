@@ -11,8 +11,8 @@ export interface GitHubRelease {
 
 const MAX_RELEASES = 3
 
-export const GITHUB_RELEASES_URL = 'https://github.com/qiqStrong/Comfy-Nova/releases'
-export const GITHUB_REPO_URL = 'https://github.com/qiqStrong/Comfy-Nova'
+export const GITHUB_RELEASES_URL = 'https://github.com/LovedeHua/Comfy-Nova/releases'
+export const GITHUB_REPO_URL = 'https://github.com/LovedeHua/Comfy-Nova'
 
 /**
  * 用随应用分发的 version.json 兜底生成一条更新日志。

@@ -38,7 +38,7 @@ class ReleaseInfo:
 class ReleaseNotesService:
     """ComfyUI Release 更新日志服务"""
     
-    JSON_DATA_URL = "https://raw.githubusercontent.com/qiqStrong/Comfy-Nova/refs/heads/main/comfyui_releases.json"
+    JSON_DATA_URL = "https://raw.githubusercontent.com/LovedeHua/Comfy-Nova/refs/heads/main/comfyui_releases.json"
     ATOM_FEED_URL = "https://github.com/Comfy-Org/ComfyUI/releases.atom"
     GITHUB_RELEASE_URL_TEMPLATE = "https://github.com/Comfy-Org/ComfyUI/releases/tag/{version}"
     

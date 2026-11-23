@@ -58,7 +58,7 @@ export function AboutHeader({ version }: AboutHeaderProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => window.open('https://github.com/qiqStrong/Comfy-Nova', '_blank', 'noopener,noreferrer')}
+                onClick={() => window.open('https://github.com/LovedeHua/Comfy-Nova', '_blank', 'noopener,noreferrer')}
                 className="size-7 rounded-md"
                 title="GitHub"
               >

@@ -413,7 +413,7 @@ export function SideBar() {
                   <button
                     type="button"
                     onClick={() => {
-                      window.open('https://github.com/qiqStrong/Comfy-Nova', '_blank', 'noopener,noreferrer')
+                      window.open('https://github.com/LovedeHua/Comfy-Nova', '_blank', 'noopener,noreferrer')
                       setGithubPopoverOpen(false)
                     }}
                     className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm hover:bg-surface-active"
@@ -424,7 +424,7 @@ export function SideBar() {
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText('https://github.com/qiqStrong/Comfy-Nova.git')
+                      navigator.clipboard.writeText('https://github.com/LovedeHua/Comfy-Nova.git')
                       success(t('sidebar.linkCopied'))
                       setGithubPopoverOpen(false)
                     }}

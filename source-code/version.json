@@ -1,7 +1,7 @@
 {
-  "version": "V1.1.1",
+  "version": "V1.4.3",
   "published_at": "2026-11-22T12:33:56Z",
-  "download_url": "https://github.com/qiqStrong/Comfy-Nova/releases/download/v1.0.2/Comfy-Nova-v1.0.2-win64.zip",
+  "download_url": "https://github.com/LovedeHua/Comfy-Nova/releases/download/v1.0.2/Comfy-Nova-v1.0.2-win64.zip",
   "file_size": 155576663,
   "file_hash": "3004727d5d730b6efc6e21a8ffb86c88f683c7123ff5cb8b1aff8f932a80877d",
   "release_notes": "## V1.1.1\n\n> 发布日期：2026-11-22\n\n### 变更\n\n- **品牌更名**：项目更名 Comfy-Nova（fork 自 Comfyui-Box / ComfyNexus），\n  窗口标题、实例锁、托盘、更新器、Bridge 插件目录同步更名\n- **更新日志本地化**：更新日志改为随包分发的 CHANGELOG.md，不再读取上游 Releases\n\n### 新增\n\n- 影院模式：滚轮缩放（锚点跟随）、拖动平移、双击切换适应/2 倍、快捷键 +/-/0\n- 影院模式：胶片条支持滚轮横向滚动与拖动\n- 影院模式：浮层控件合并为单条工具条，鼠标静止自动隐藏\n- 资产库分类树：移除冗余的三竖点按钮（右键菜单保留全部操作）\n\n### 修复\n\n- 影院模式平移：适应窗口下可拖动、缩放原点对齐图片中心、拖动位移与鼠标一致\n- 插件更新：排队不再误报超时，镜像重试共享时间预算，103 插件 57s → 23s\n- 依赖安装失败时输出可读原因（代理/镜像/网络提示）\n- test_isolation 模块缺失导致版本切换/插件安装报 ModuleNotFoundError\n- 高 DPI 下窗口尺寸正确；打包补收 libffi-8.dll 修复启动即崩\n\n---"
