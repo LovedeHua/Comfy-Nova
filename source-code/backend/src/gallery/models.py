@@ -250,6 +250,11 @@ class GallerySettings:
     library_path: str = ""
     # 输入图片库路径（与生成图库分开管理、分开扫描、分开存储）
     input_library_path: str = ""
+    # 界面偏好：视图布局与当前资产来源。
+    # 存后端而不是只靠 localStorage —— WebView2 下 localStorage 可能因窗口
+    # 非正常关闭而丢失，用户"选了网格，下次打开又是瀑布流"就是这个问题。
+    view_mode: str = "masonry"
+    asset_source: str = "generated"
     last_scan_time: Optional[str] = None
     nsfw_auto_classify: bool = False
     nsfw_threshold: float = 0.6
@@ -259,6 +264,8 @@ class GallerySettings:
         return {
             "libraryPath": self.library_path,
             "inputLibraryPath": self.input_library_path,
+            "viewMode": self.view_mode,
+            "assetSource": self.asset_source,
             "lastScanTime": self.last_scan_time,
             "nsfwAutoClassify": self.nsfw_auto_classify,
             "nsfwThreshold": self.nsfw_threshold,
@@ -270,6 +277,8 @@ class GallerySettings:
         return cls(
             library_path=data.get("libraryPath", ""),
             input_library_path=data.get("inputLibraryPath", ""),
+            view_mode=data.get("viewMode", "masonry"),
+            asset_source=data.get("assetSource", "generated"),
             last_scan_time=data.get("lastScanTime"),
             nsfw_auto_classify=data.get("nsfwAutoClassify", False),
             nsfw_threshold=data.get("nsfwThreshold", 0.6),

@@ -283,6 +283,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   _pollingInterval: null as NodeJS.Timeout | null,
   thumbnailSize: Number(localStorage.getItem('thumbnailSize')) || 250,
   showFoldersInList: localStorage.getItem('asset-show-folders-in-list') === 'true',
+  // 初始值先用 localStorage（同步、无闪烁）；loadData 拿到后端 settings 后
+  // 若后端有更权威的偏好则覆盖——WebView2 下 localStorage 可能丢失。
   viewMode: localStorage.getItem('asset-view-mode') === 'grid' ? 'grid' : 'masonry',
   // 当前管理的资产来源：generated=生成图库，input=输入图库（两库数据完全隔离）
   assetSource: 'generated' as 'generated' | 'input',
@@ -349,9 +351,26 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         
         console.log('[useAssetStore] 计算缩略图 URL，示例:', assetsWithThumbnail[0]?.thumbnail)
         
+        // 后端保存的界面偏好优先于 localStorage：
+        // WebView2 非正常关闭会丢 localStorage，导致"选了网格下次又是瀑布流"。
+        const backendViewMode = result.settings?.viewMode
+        const backendSource = result.settings?.assetSource
+        const restoredViewMode =
+          backendViewMode === 'grid' || backendViewMode === 'masonry'
+            ? backendViewMode
+            : get().viewMode
+        if (backendViewMode && backendViewMode !== localStorage.getItem('asset-view-mode')) {
+          localStorage.setItem('asset-view-mode', backendViewMode)
+        }
+
         set({
           assets: assetsWithThumbnail,
           categories: result.categories || [],
+          viewMode: restoredViewMode,
+          assetSource:
+            backendSource === 'input' || backendSource === 'generated'
+              ? backendSource
+              : get().assetSource,
           settings: {
             libraryPath: result.settings?.libraryPath || '',
             inputLibraryPath: result.settings?.inputLibraryPath || '',
@@ -644,6 +663,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     if (get().assetSource === source) return
     // 切换标签即切换数据列表：清空当前库数据并重新从后端加载对应库
     set({ assetSource: source, selectedCategoryId: 'all', assets: [], isLoading: true })
+    // 记住当前来源，下次打开保持在同一库
+    window.pywebview?.api?.gallery_save_ui_preferences?.(undefined, source)?.catch?.(() => {})
     get().loadData()
   },
 
@@ -1183,6 +1204,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   setViewMode: (mode) => {
     localStorage.setItem('asset-view-mode', mode)
     set({ viewMode: mode })
+    // 同时落后端：localStorage 在 WebView2 下可能因非正常关闭而丢失
+    window.pywebview?.api?.gallery_save_ui_preferences?.(mode, undefined)?.catch?.(() => {})
   },
 
   hasAttributeFilter: () => {

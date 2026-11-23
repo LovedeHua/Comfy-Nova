@@ -142,6 +142,22 @@ class GalleryStorage:
         data = self.load()
         return data.settings
 
+    def update_ui_preferences(
+        self,
+        view_mode: Optional[str] = None,
+        asset_source: Optional[str] = None,
+    ) -> bool:
+        """保存界面偏好（视图布局 / 当前资产来源）。
+
+        这些偏好存后端，WebView2 下 localStorage 可能丢失，不能只靠前端。
+        """
+        data = self.load()
+        if view_mode is not None:
+            data.settings.view_mode = view_mode
+        if asset_source is not None:
+            data.settings.asset_source = asset_source
+        return self.save()
+
     def update_settings(
         self,
         library_path: Optional[str] = None,

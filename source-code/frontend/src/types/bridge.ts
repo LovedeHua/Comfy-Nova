@@ -1674,6 +1674,8 @@ export interface PyWebViewAPI {
     settings?: {
       libraryPath: string
       inputLibraryPath: string
+      viewMode?: string
+      assetSource?: string
       lastScanTime: string | null
       nsfwAutoClassify: boolean
       nsfwThreshold: number
@@ -1756,6 +1758,11 @@ export interface PyWebViewAPI {
     updated?: number
     removed?: number
     errors?: string[]
+    error_message?: string
+  }>;
+
+  gallery_save_ui_preferences: (viewMode?: string, assetSource?: string) => Promise<{
+    success: boolean
     error_message?: string
   }>;
 

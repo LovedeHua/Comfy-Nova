@@ -7699,6 +7699,10 @@ class Api:
         """扫描资产库目录"""
         return self._gallery_controller.gallery_scan(library_path)
 
+    def gallery_save_ui_preferences(self, view_mode: str = None, asset_source: str = None) -> dict:
+        """保存资产库界面偏好（视图布局 / 资产来源）"""
+        return self._gallery_controller.gallery_save_ui_preferences(view_mode, asset_source)
+
     def gallery_scan_input(self, input_library_path: str = None) -> dict:
         """全量扫描输入图片库（与生成图库分开管理）"""
         return self._gallery_controller.gallery_scan_input(input_library_path)
