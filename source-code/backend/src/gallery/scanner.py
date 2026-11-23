@@ -447,11 +447,14 @@ class GalleryScanner:
                 stat = file_path.stat()
                 existing = existing_assets.get(str(file_path))
                 if existing is not None:
-                    # 用 ctime+size 判断是否变化（与生成库一致）；
-                    # 不能用 thumbnail_path 判据——缩略图由后台线程异步补，
-                    # 重扫时可能还没补上，会导致每次都误判为"需更新"。
+                    # 文件未变化也要回填 category_id：历史输入图是在建文件夹分类前
+                    # 入库的，category_id 恒为 None，重扫时文件没变化会被跳过，
+                    # 导致子文件夹里的图片永远显示不出来。
                     if not self._needs_update(existing, file_path):
                         found_files[relative] = existing
+                        if existing.category_id != category_id:
+                            gallery_storage.update_asset(existing.id, category_id=category_id)
+                            updated_count += 1
                         continue
                     self._update_asset(existing, file_path, category_id)
                     existing.source = "input"
