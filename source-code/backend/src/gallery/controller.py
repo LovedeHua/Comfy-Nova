@@ -261,14 +261,23 @@ class GalleryController:
             logger.error(f"[GalleryController] 保存设置失败: {e}")
             return {"success": False, "error_message": str(e)}
 
-    def gallery_save_ui_preferences(self, view_mode: str = None, asset_source: str = None) -> dict:
-        """保存界面偏好（视图布局 / 当前资产来源）。
+    def gallery_save_ui_preferences(
+        self,
+        view_mode: str = None,
+        asset_source: str = None,
+        theater_strip_height: int = None,
+    ) -> dict:
+        """保存界面偏好（视图布局 / 当前资产来源 / 影院胶片条高度）。
 
         存后端而非仅 localStorage：WebView2 非正常关闭会丢 localStorage，
-        表现为"选了网格布局，下次打开又是瀑布流"。
+        表现为"选了网格布局，下次打开又是瀑布流""调好的胶片条高度又回到默认"。
         """
         try:
-            gallery_storage.update_ui_preferences(view_mode=view_mode, asset_source=asset_source)
+            gallery_storage.update_ui_preferences(
+                view_mode=view_mode,
+                asset_source=asset_source,
+                theater_strip_height=theater_strip_height,
+            )
             return {"success": True}
         except Exception as e:
             logger.error(f"[GalleryController] 保存界面偏好失败: {e}")

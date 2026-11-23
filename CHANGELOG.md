@@ -9,6 +9,31 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.6.7
+
+> 发布日期：2026-11-23
+
+### 修复
+
+- **影院模式底部胶片条高度没有记忆**：此前只存 localStorage，而 WebView2
+  非正常关闭会丢失 localStorage（视图布局正是因为同样原因才移到后端）。
+  现改为双写：localStorage 供本次运行快速读取，后端
+  `GallerySettings.theater_strip_height` 供重启后恢复。
+  - 后端：模型字段 + `update_ui_preferences` 参数 + 控制器/桥接透传
+  - 前端：拖动结束与重置走统一 `persistStripBarHeight`；
+    挂载时从 store 已加载的 settings 读取（不额外请求后端）
+- 顺带修正：行高计算里残留的 `STRIP_RING_PADDING = 8` 已移除。
+  选中描边改为内嵌层后不再需要为环让出空间，多扣会让缩略图凭空矮 8px
+
+### 实测
+
+- 后端单测：存 138 → 重启读回 138；to_dict/from_dict 往返正确；
+  只改 view_mode 不影响高度
+- E2E：进入时读后端值 150；拖动到 200 触发保存；模拟重开应用后恢复 200
+- tsc / build 通过，gallery 测试 23 passed
+
+---
+
 ## V1.6.6
 
 > 发布日期：2026-11-23

@@ -146,8 +146,9 @@ class GalleryStorage:
         self,
         view_mode: Optional[str] = None,
         asset_source: Optional[str] = None,
+        theater_strip_height: Optional[int] = None,
     ) -> bool:
-        """保存界面偏好（视图布局 / 当前资产来源）。
+        """保存界面偏好（视图布局 / 当前资产来源 / 影院胶片条高度）。
 
         这些偏好存后端，WebView2 下 localStorage 可能丢失，不能只靠前端。
         """
@@ -156,6 +157,8 @@ class GalleryStorage:
             data.settings.view_mode = view_mode
         if asset_source is not None:
             data.settings.asset_source = asset_source
+        if theater_strip_height is not None:
+            data.settings.theater_strip_height = theater_strip_height
         return self.save()
 
     def update_settings(

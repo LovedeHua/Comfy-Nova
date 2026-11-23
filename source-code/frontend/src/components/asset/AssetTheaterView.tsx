@@ -68,11 +68,32 @@ const STRIP_BAR_MAX = 240
 const STRIP_BAR_DEFAULT = 76
 const STRIP_BAR_STORAGE_KEY = 'theater-strip-height'
 
-/** 读取上次保存的胶片条高度，越界值收敛到允许区间 */
+/** 把任意值收敛到允许区间 */
+function clampStripBarHeight(value: number): number {
+  return Math.min(STRIP_BAR_MAX, Math.max(STRIP_BAR_MIN, value))
+}
+
+/** 读取 localStorage 里的胶片条高度（首帧快速生效）。 */
 function readStoredStripBarHeight(): number {
   const raw = Number(localStorage.getItem(STRIP_BAR_STORAGE_KEY))
   if (!Number.isFinite(raw) || raw <= 0) return STRIP_BAR_DEFAULT
-  return Math.min(STRIP_BAR_MAX, Math.max(STRIP_BAR_MIN, raw))
+  return clampStripBarHeight(raw)
+}
+
+/**
+ * 保存影院胶片条高度。
+ *
+ * 双写：localStorage 供本次运行快速读取，后端供 WebView2 异常关闭后恢复——
+ * localStorage 在那种情况下会丢，用户调好的高度会被重置回默认值。
+ */
+function persistStripBarHeight(height: number): void {
+  try {
+    localStorage.setItem(STRIP_BAR_STORAGE_KEY, String(height))
+  } catch {
+    // localStorage 不可用时忽略，后端仍会保存
+  }
+  void window.pywebview?.api?.gallery_save_ui_preferences?.(undefined, undefined, height)
+    ?.catch?.(() => {})
 }
 
 const CHROME_REGIONS: ChromeRegion[] = ['nav', 'filter', 'detail']
@@ -145,6 +166,25 @@ export function AssetTheaterView({
   const [scaleLabel, setScaleLabel] = useState(1)
   // 底部胶片条容器高度：可拖动上边缘调整，缩略图按容器高度自适应缩放
   const [stripBarHeight, setStripBarHeight] = useState(readStoredStripBarHeight)
+  /*
+   * 后端偏好优先于 localStorage 初值。
+   *
+   * WebView2 非正常关闭会丢 localStorage，只靠它保存的话用户调好的高度
+   * 下次打开会被重置回默认值。后端存一份，读到后覆盖本地初值。
+   * 只在挂载时读一次：拖动过程中不能被异步结果回写打断。
+   */
+  // 直接从 store 里已加载的 settings 取，不再额外请求后端
+  // （gallery_get_assets 会拉全量资产列表，为读一个数字付那个代价不值当）。
+  const backendStripHeight = useAssetStore((state) => state.settings?.theaterStripHeight)
+  const backendHeightAppliedRef = useRef(false)
+  useEffect(() => {
+    if (backendHeightAppliedRef.current) return
+    if (typeof backendStripHeight !== 'number' || !Number.isFinite(backendStripHeight)) return
+    backendHeightAppliedRef.current = true
+    const clamped = clampStripBarHeight(backendStripHeight)
+    setStripBarHeight(clamped)
+    try { localStorage.setItem(STRIP_BAR_STORAGE_KEY, String(clamped)) } catch { /* 忽略 */ }
+  }, [backendStripHeight])
   const [isResizingStrip, setIsResizingStrip] = useState(false)
   const stripResizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
 
@@ -423,13 +463,13 @@ export function AssetTheaterView({
     stripResizeRef.current = null
     setIsResizingStrip(false)
     // 落盘：下次进入影院沿用这个高度
-    localStorage.setItem(STRIP_BAR_STORAGE_KEY, String(stripBarHeight))
+    persistStripBarHeight(stripBarHeight)
     try { event.currentTarget.releasePointerCapture?.(event.pointerId) } catch { /* 忽略 */ }
   }, [stripBarHeight])
 
   const handleStripResizeReset = useCallback(() => {
     setStripBarHeight(STRIP_BAR_DEFAULT)
-    localStorage.setItem(STRIP_BAR_STORAGE_KEY, String(STRIP_BAR_DEFAULT))
+    persistStripBarHeight(STRIP_BAR_DEFAULT)
   }, [])
 
   // 预取前后各一张的原图。左右切换时绝大多数情况下都能命中浏览器缓存，
@@ -505,13 +545,13 @@ export function AssetTheaterView({
   // 行高 = 容器高 − 1px 上边框 − 8px 横向滚动条。
   // 滚动条（.scrollbar-thin 固定 8px）会吃掉滚动容器的可用高度；不扣掉的话
   // 格子会被顶出可视区，表现为"缩略图底部显示不全"。
+  // 注意：不要再额外扣"选中环留白"——选中描边已改为绝对定位的内嵌层
+  // （不越界），容器不需要为上/下让出空间，多扣会让缩略图凭空矮一截。
   const STRIP_BORDER = 1
   const STRIP_SCROLLBAR = 8
-  // 滚动容器上下各 py-1（4px），用于给选中环留绘制空间
-  const STRIP_RING_PADDING = 8
   const stripRowInnerHeight = Math.max(
     1,
-    stripBarHeight - STRIP_BORDER - STRIP_SCROLLBAR - STRIP_RING_PADDING
+    stripBarHeight - STRIP_BORDER - STRIP_SCROLLBAR
   )
 
   // 格子边长：行高减去上下 GAP（保持正方形，且与行高同源推导）

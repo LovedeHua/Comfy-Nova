@@ -1676,6 +1676,7 @@ export interface PyWebViewAPI {
       inputLibraryPath: string
       viewMode?: string
       assetSource?: string
+      theaterStripHeight?: number
       lastScanTime: string | null
       nsfwAutoClassify: boolean
       nsfwThreshold: number
@@ -1776,7 +1777,11 @@ export interface PyWebViewAPI {
     error_message?: string
   }>;
 
-  gallery_save_ui_preferences: (viewMode?: string, assetSource?: string) => Promise<{
+  gallery_save_ui_preferences: (
+    viewMode?: string,
+    assetSource?: string,
+    theaterStripHeight?: number
+  ) => Promise<{
     success: boolean
     error_message?: string
   }>;

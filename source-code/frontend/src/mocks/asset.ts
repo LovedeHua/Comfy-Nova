@@ -60,6 +60,8 @@ export interface GallerySettings {
   nsfwAutoClassify: boolean
   nsfwThreshold: number
   nsfwAutoBlur: boolean
+  /** 影院模式底部胶片条高度（px），存后端以便 WebView2 异常关闭后恢复 */
+  theaterStripHeight?: number
 }
 
 export const mockAssetCategories: AssetCategory[] = [

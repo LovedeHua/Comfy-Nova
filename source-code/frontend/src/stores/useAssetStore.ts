@@ -391,7 +391,8 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
             lastScanTime: result.settings?.lastScanTime || null,
             nsfwAutoClassify: result.settings?.nsfwAutoClassify ?? false,
             nsfwThreshold: result.settings?.nsfwThreshold ?? 0.6,
-            nsfwAutoBlur: result.settings?.nsfwAutoBlur ?? true
+            nsfwAutoBlur: result.settings?.nsfwAutoBlur ?? true,
+            theaterStripHeight: result.settings?.theaterStripHeight
           },
           isLoading: false
         })

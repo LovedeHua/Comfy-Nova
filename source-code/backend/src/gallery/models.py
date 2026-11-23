@@ -255,6 +255,9 @@ class GallerySettings:
     # 非正常关闭而丢失，用户"选了网格，下次打开又是瀑布流"就是这个问题。
     view_mode: str = "masonry"
     asset_source: str = "generated"
+    # 影院模式底部胶片条高度（px）。同样存后端，避免 localStorage 丢失后
+    # 用户调好的高度下次打开又被重置回默认值。
+    theater_strip_height: int = 76
     last_scan_time: Optional[str] = None
     nsfw_auto_classify: bool = False
     nsfw_threshold: float = 0.6
@@ -266,6 +269,7 @@ class GallerySettings:
             "inputLibraryPath": self.input_library_path,
             "viewMode": self.view_mode,
             "assetSource": self.asset_source,
+            "theaterStripHeight": self.theater_strip_height,
             "lastScanTime": self.last_scan_time,
             "nsfwAutoClassify": self.nsfw_auto_classify,
             "nsfwThreshold": self.nsfw_threshold,
@@ -279,6 +283,7 @@ class GallerySettings:
             input_library_path=data.get("inputLibraryPath", ""),
             view_mode=data.get("viewMode", "masonry"),
             asset_source=data.get("assetSource", "generated"),
+            theater_strip_height=int(data.get("theaterStripHeight", 76) or 76),
             last_scan_time=data.get("lastScanTime"),
             nsfw_auto_classify=data.get("nsfwAutoClassify", False),
             nsfw_threshold=data.get("nsfwThreshold", 0.6),
