@@ -9,6 +9,31 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.7.1
+
+> 发布日期：2026-11-23
+
+### 修复
+
+- **输入资产文件夹路径保存不下来**：前端两处把整个 `settings` 对象**替换**
+  而不是合并，后端一旦少返回某个字段（不同版本、不同接口），已有值就被
+  抹成 `undefined`/`''`，输入库路径因此反复丢失。
+  - `getSettings`：改为 `{ ...当前, ...后端 }` 合并
+  - `saveSettings`：改为在当前设置基础上只覆盖 `libraryPath` /
+    `inputLibraryPath`，其余字段（视图偏好、胶片条高度等）原样保留，
+    并对 `currentSettings` 为 null 的首启场景加默认值兜底
+
+### 实测
+
+经 vite dev server 动态导入真实 store 模块验证（不依赖 UI 渲染）：
+- 后端只返回 `libraryPath` 时，`inputLibraryPath` 仍保留已有值 ✓
+- `saveSettings` 后 `inputLibraryPath` 正确写入 ✓
+- 其它字段 `theaterStripHeight` 未被覆盖 ✓
+- 后端链路（用真实 assets.json 副本）保存/读回均正常；
+  后端 288 passed；tsc / build 通过
+
+---
+
 ## V1.7.0
 
 > 发布日期：2026-11-23

@@ -943,8 +943,11 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
 
       const result = await window.pywebview.api.gallery_get_settings()
       if (result.success && result.settings) {
-        set({ settings: result.settings })
-        return result.settings
+        // 合并而非整体替换：后端若因版本差异少返回某个字段，
+        // 直接替换会把已有值抹成 undefined（输入库路径丢失就是这么来的）。
+        const merged = { ...get().settings, ...result.settings }
+        set({ settings: merged })
+        return merged as typeof result.settings
       }
 
       const defaultSettings = { libraryPath: '', inputLibraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true }
@@ -968,14 +971,25 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       const result = await window.pywebview.api.gallery_save_settings(libraryPath, inputLibraryPath)
       if (result.success) {
         const currentSettings = get().settings
-        set({ settings: { 
-          libraryPath, 
-          inputLibraryPath: inputLibraryPath ?? currentSettings?.inputLibraryPath ?? '',
-          lastScanTime: currentSettings?.lastScanTime || null,
-          nsfwAutoClassify: currentSettings?.nsfwAutoClassify || false,
-          nsfwThreshold: currentSettings?.nsfwThreshold || 0.6,
-          nsfwAutoBlur: currentSettings?.nsfwAutoBlur ?? true
-        }})
+        // 合并保留 readdir 之外的所有已有字段（视图预览偏好、胶片条高度等），
+        // 不能只列固定几个键——那会把未列出的字段丢掉。
+        // currentSettings 可能为 null（首启未加载），用默认值兜底后再合并，
+        // 保证 GallerySettings 的必填字段（lastScanTime 等）不会变成 undefined。
+        const base = currentSettings ?? {
+          libraryPath: '',
+          inputLibraryPath: '',
+          lastScanTime: null,
+          nsfwAutoClassify: false,
+          nsfwThreshold: 0.6,
+          nsfwAutoBlur: true
+        }
+        set({
+          settings: {
+            ...base,
+            libraryPath,
+            inputLibraryPath: inputLibraryPath ?? base.inputLibraryPath ?? ''
+          }
+        })
         return true
       }
       return false
