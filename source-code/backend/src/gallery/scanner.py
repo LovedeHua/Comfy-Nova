@@ -21,9 +21,12 @@ SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".webm"}
 SUPPORTED_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS | SUPPORTED_VIDEO_EXTENSIONS
 
-# 缩略图最长边。网格卡片常见显示宽度 200–400 px，2x DPI 下 400–800 px 已足够；
-# 取 512 在清晰度与内存之间折中（512×512 RGBA 解码约 1 MB，4K 原图是 30–50 MB）。
-THUMBNAIL_MAX_SIZE = 512
+# 缩略图最长边。网格卡片实际显示宽度约 250 px，影院胶片条约 60 px；
+# 256 在 2x DPI 下对 250px 卡片仍清晰，而解码 bitmap 从 512² 的约 1MB
+# 降到 256² 的约 256KB —— 这是 renderer 内存的主要来源，收益 4 倍。
+THUMBNAIL_MAX_SIZE = 256
+# 文件名里的尺寸标记：用于识别旧版 512 缩略图并触发重建
+THUMBNAIL_TAG = f"s{THUMBNAIL_MAX_SIZE}"
 # webp 质量：80 在缩略图尺度上看不出劣化，体积约为 90 的 60%。
 THUMBNAIL_QUALITY = 80
 
@@ -669,8 +672,17 @@ class GalleryScanner:
         updated = 0
         with gallery_storage.batch_updates():
             for asset in gallery_storage.get_assets():
-                if asset.asset_type != "image" or asset.thumbnail_path:
+                if asset.asset_type != "image":
                     continue
+                # 已有缩略图但不含当前尺寸标记 → 旧版大图（512），重建为 256
+                if asset.thumbnail_path:
+                    if f"_{THUMBNAIL_TAG}.webp" in asset.thumbnail_path:
+                        continue
+                    # 删除旧缩略图文件，避免磁盘堆积
+                    old_thumb = self._thumbnails_dir.parent / asset.thumbnail_path
+                    if old_thumb.exists():
+                        try: old_thumb.unlink()
+                        except OSError: pass
                 file_path = Path(asset.file_path)
                 if not file_path.exists():
                     continue
@@ -722,8 +734,10 @@ class GalleryScanner:
                 img.draft("RGB", (THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE))
                 img.thumbnail((THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE), Image.Resampling.LANCZOS)
 
+                # 文件名带尺寸标记：旧版 512 缩略图（无标记或 s512）会被
+                # backfill 识别并重建为 256，实现平滑迁移、无需用户手动清缓存。
                 thumbnail_filename = (
-                    f"{file_path.stem}_{hashlib.md5(str(file_path).encode()).hexdigest()[:8]}.webp"
+                    f"{file_path.stem}_{hashlib.md5(str(file_path).encode()).hexdigest()[:8]}_{THUMBNAIL_TAG}.webp"
                 )
                 thumbnail_path = self._thumbnails_dir / thumbnail_filename
                 self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
