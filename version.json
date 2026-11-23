@@ -1,8 +1,8 @@
 {
-  "version": "V1.5.6",
-  "published_at": "2026-11-23T11:46:44Z",
-  "download_url": "https://github.com/LovedeHua/Comfy-Nova/releases/download/v1.5.6/Comfy-Nova-v1.5.6-win64.zip",
-  "file_size": 159512099,
-  "file_hash": "a108c3ae5b12949b9a14a7468eea731a77434b2a1b8559dd5c1ae49c6195d592",
+  "version": "v1.5.6",
+  "published_at": "2026-11-23T11:47:19Z",
+  "download_url": "",
+  "file_size": 0,
+  "file_hash": "",
   "release_notes": "## V1.5.6\n\n> 发布日期：2026-11-23\n\n### 优化\n\n- **输出资产/输入资产切换不再刷新图片**：切换标签原先会清空数据并重新请求，\n  缩略图重新加载造成闪烁。改为双来源缓存 `assetsBySource` / `categoriesBySource`：\n  加载过的来源缓存起来，切标签时命中缓存直接切换，不发请求、不清空、不闪烁；\n  只有缓存为空（首次进入某来源）才真正加载。手动刷新不受影响。\n\n---"
 }
