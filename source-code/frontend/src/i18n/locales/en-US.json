@@ -2039,7 +2039,8 @@
       "selectHint": "Select a workflow to see its preview, info, node graph and plugin list here",
       "graph": "Node Graph",
       "noRawData": "Cannot read the raw data of this workflow",
-      "apiFormatHint": "This file is in API format: nodes can be counted but no graph can be drawn"
+      "apiFormatHint": "This file is in API format: nodes can be counted but no graph can be drawn",
+      "expandGraph": "Expand"
     },
     "viewModes": {
       "list": "Compact List",
@@ -4109,7 +4110,7 @@
     "category": {
       "all": "All",
       "favorites": "Favorites",
-      "uncategorized": "Uncategorized",
+      "uncategorized": "Root",
       "localLibrary": "Local Library",
       "referenceLibrary": "Reference Library",
       "namePlaceholder": "Category name",
@@ -4229,8 +4230,8 @@
       "failed": "Push failed, please try again"
     },
     "sourceTab": {
-      "generated": "Generated",
-      "input": "Input"
+      "generated": "Output Assets",
+      "input": "Input Assets"
     }
   },
   "dataSetup": {

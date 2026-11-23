@@ -8,9 +8,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Download, Network, Star, Trash2 } from 'lucide-react'
+import { Download, Maximize2, Network, Star, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { PreviewCarousel } from './PreviewCarousel'
 import { WorkflowGraph } from './WorkflowGraph'
 import { WorkflowStats } from './WorkflowStats'
@@ -54,6 +60,8 @@ export function WorkflowDetailPanel({
 }: WorkflowDetailPanelProps) {
   const { t } = useTranslation()
   const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null)
+  // 节点图全屏查看：预览画布只有 220px，细节需要放大时用它
+  const [graphExpanded, setGraphExpanded] = useState(false)
   const [pluginStatusMap, setPluginStatusMap] = useState<Record<string, PluginInstallStatus>>({})
   const [statusNonce, setStatusNonce] = useState(0)
   const [isMapLoaded, setIsMapLoaded] = useState(false)
@@ -208,9 +216,22 @@ export function WorkflowDetailPanel({
             )}
 
             <div className="border-b border-border-subtle p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-[12px] font-bold text-foreground">
-                <Network className="size-3.5 text-muted-foreground" />
-                {t('workflow.detail.graph')}
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[12px] font-bold text-foreground">
+                  <Network className="size-3.5 text-muted-foreground" />
+                  {t('workflow.detail.graph')}
+                </div>
+                {!stats?.isApiFormat && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 text-muted-foreground hover:text-foreground"
+                    onClick={() => setGraphExpanded(true)}
+                    title={t('workflow.detail.expandGraph')}
+                  >
+                    <Maximize2 className="size-3.5" />
+                  </Button>
+                )}
               </div>
               <div className="h-[220px]">
                 {stats?.isApiFormat ? (
@@ -239,6 +260,25 @@ export function WorkflowDetailPanel({
           <div className="p-3 text-sm text-muted-foreground">{t('workflow.detail.noRawData')}</div>
         )}
       </div>
+
+      {/* 全屏看节点图：预览区只有 220px，细节放大时用弹窗，关闭后回到原面板 */}
+      {workflow.rawData && !stats?.isApiFormat && (
+        <Dialog open={graphExpanded} onOpenChange={setGraphExpanded}>
+          <DialogContent className="max-w-[92vw] p-0 sm:max-w-[92vw]">
+            <DialogHeader className="border-b border-border-subtle px-4 py-3">
+              <DialogTitle className="text-sm font-bold">{t('workflow.detail.graph')}</DialogTitle>
+            </DialogHeader>
+            <div className="h-[76vh] w-full p-3">
+              <WorkflowGraph
+                data={workflow.rawData}
+                selectedPluginId={selectedPluginId}
+                className="size-full"
+                showMiniMap
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

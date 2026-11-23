@@ -2142,7 +2142,8 @@
       "selectHint": "选中一个工作流，这里显示它的预览、信息、节点图和插件清单",
       "graph": "节点图",
       "noRawData": "无法读取该工作流的原始数据",
-      "apiFormatHint": "该文件是 API 格式，只能统计节点数，没有可绘制的节点图"
+      "apiFormatHint": "该文件是 API 格式，只能统计节点数，没有可绘制的节点图",
+      "expandGraph": "展开大图"
     },
     "viewModes": {
       "list": "紧凑列表",
@@ -4700,7 +4701,7 @@
     "category": {
       "all": "全部",
       "favorites": "收藏",
-      "uncategorized": "未分类",
+      "uncategorized": "根目录",
       "localLibrary": "本地生成库",
       "referenceLibrary": "参考资产库",
       "namePlaceholder": "输入分类名称",
@@ -4827,8 +4828,8 @@
       "failed": "推送失败，请重试"
     },
     "sourceTab": {
-      "generated": "生成图",
-      "input": "输入图"
+      "generated": "输出资产",
+      "input": "输入资产"
     }
   },
   "dataSetup": {
