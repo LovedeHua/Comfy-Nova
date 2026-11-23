@@ -359,6 +359,23 @@ class GalleryController:
             logger.error(f"[GalleryController] 扫描失败: {e}")
             return {"success": False, "error_message": str(e)}
 
+    def gallery_start_background_incremental_scan(self, library_path: str = None) -> dict:
+        """在后台启动增量扫描（进资产库自动触发、手动增量刷新都走它）。
+
+        同步扫描 4711 个文件要 2 分钟，会卡死 UI 且前端拿不到结果，
+        表现为"自动刷新了却扫不出东西"。后台执行后立即返回，前端轮询进度。
+        """
+        try:
+            if library_path is None:
+                settings = gallery_storage.get_settings()
+                library_path = settings.library_path
+            if not library_path:
+                return {"success": False, "error_message": "未配置资产库路径"}
+            return gallery_scanner.start_background_incremental_scan(library_path)
+        except Exception as e:
+            logger.error(f"[GalleryController] 启动后台增量扫描失败: {e}")
+            return {"success": False, "error_message": str(e)}
+
     def gallery_incremental_scan(self, library_path: str = None) -> dict:
         """
         增量扫描资产库目录

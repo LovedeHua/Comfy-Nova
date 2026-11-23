@@ -274,6 +274,42 @@ const filterCache: { key: unknown[]; value: Asset[] } = { key: [], value: [] }
  */
 let sourceRestoredFromBackend = false
 
+/**
+ * 轮询后台扫描直到结束。
+ *
+ * 后台扫描是异步的：后端在线程里跑，前端只能靠 gallery_get_scan_status
+ * 判断是否完成。超时留足余量（大库首次扫描可能要几分钟），
+ * 超时后仍返回当前累计计数，由调用方 loadData 拿已落盘的数据。
+ */
+async function pollUntilScanDone(timeoutMs = 10 * 60 * 1000): Promise<{
+  added: number
+  updated: number
+  removed: number
+}> {
+  const startedAt = Date.now()
+  let last = { added: 0, updated: 0, removed: 0 }
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const status = await window.pywebview?.api?.gallery_get_scan_status?.()
+      if (!status) continue
+      const progress = status.progress
+      if (progress) {
+        if (progress.stage === 'done') {
+          return last
+        }
+      }
+      // 后端 _scanning 为 false 且已无进度 → 扫描线程已结束
+      if (status.scanning === false && !progress) {
+        return last
+      }
+    } catch {
+      // 读状态失败不终止轮询，下一轮再试
+    }
+  }
+  return last
+}
+
 export const useAssetStore = create<AssetStore>((set, get) => ({
   assets: [],
   categories: [],
@@ -498,22 +534,29 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         return { success: true, added: 0, updated: 0, removed: 0 }
       }
 
-      const result = await window.pywebview.api.gallery_incremental_scan()
-      set({ isScanning: false })
-
-      if (result.success) {
-        // 后端已在增量扫描时同步输入库，这里一次刷新即可拿到两库最新数据
-        await get().loadData()
-        return {
-          success: true,
-          added: result.added,
-          updated: result.updated,
-          removed: result.removed
-        }
+      /*
+       * 后台扫描 + 轮询，不能同步等待。
+       *
+       * 同步调用要跑约 2 分钟（4711 个文件），期间 UI 完全阻塞、调用不返回，
+       * 前端拿不到结果也无法刷新列表——表现就是"进资产库自动刷新了，
+       * 但扫不出东西"。改为：启动后台任务立即返回，轮询到 done 再 loadData。
+       */
+      const result = await window.pywebview.api.gallery_start_background_incremental_scan()
+      if (!result.success) {
+        set({ isScanning: false, error: result.error_message || i18n.t('asset.error.scanFailed') })
+        return { success: false }
       }
 
-      set({ error: result.error_message || i18n.t('asset.error.scanFailed') })
-      return { success: false }
+      const finalResult = await pollUntilScanDone()
+      set({ isScanning: false })
+      // 扫描结束（无论成功失败）都刷新一次，拿到后端已落盘的数据
+      await get().loadData()
+      return {
+        success: true,
+        added: finalResult.added,
+        updated: finalResult.updated,
+        removed: finalResult.removed
+      }
     } catch (error) {
       console.error('[useAssetStore] 增量扫描异常:', error)
       set({ isScanning: false, error: i18n.t('asset.error.scanException', { error: String(error) }) })

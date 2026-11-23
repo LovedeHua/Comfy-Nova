@@ -142,6 +142,59 @@ class GalleryScanner:
             "message": "扫描任务已启动"
         }
 
+    def start_background_incremental_scan(self, library_path: str) -> dict:
+        """在后台线程执行增量扫描（含输入库同步）。
+
+        进资产库时自动触发的就是这条路径。此前走同步调用：4711 个文件要跑
+        约 2 分钟，期间 UI 完全阻塞、前端拿不到结果，表现为"自动刷新了却
+        扫不出东西"。改为后台执行后调用立即返回，前端轮询进度即可。
+        """
+        if GalleryScanner._scanning:
+            return {"success": False, "message": "已有扫描任务在进行中"}
+
+        GalleryScanner._scanning = True
+        GalleryScanner._stopping = False
+        GalleryScanner._scan_progress = ScanProgress(
+            stage="scanning", current=0, total=0, message="准备扫描…"
+        )
+        self._cancelled = False
+
+        def scan_thread():
+            try:
+                result = self.scan_library_incremental(
+                    library_path, self._internal_progress_callback
+                )
+                # 输入库同样在后台顺带同步，失败不影响输出库结果
+                try:
+                    settings = gallery_storage.get_settings()
+                    if settings.input_library_path:
+                        self.scan_input_library(settings.input_library_path)
+                except Exception as input_error:
+                    logger.warning(f"[GalleryScanner] 后台同步输入库失败: {input_error}")
+
+                added = result.get("added", 0)
+                updated = result.get("updated", 0)
+                removed = result.get("removed", 0)
+                GalleryScanner._scan_progress = ScanProgress(
+                    stage="done",
+                    current=added + updated + removed,
+                    total=added + updated + removed,
+                    message=f"扫描完成: 新增 {added}, 更新 {updated}, 移除 {removed}"
+                )
+            except Exception as e:
+                logger.error(f"[GalleryScanner] 后台增量扫描失败: {e}")
+                GalleryScanner._scan_progress = ScanProgress(
+                    stage="done", current=0, total=0, message=f"扫描失败: {e}"
+                )
+            finally:
+                GalleryScanner._scanning = False
+                GalleryScanner._stopping = False
+
+        thread = threading.Thread(target=scan_thread, daemon=True, name="gallery-incremental-scan")
+        thread.start()
+        return {"success": True, "message": "扫描已在后台启动"}
+
+
     def _internal_progress_callback(self, current: int, total: int, filename: str, asset_data: dict = None):
         """内部进度回调，更新类变量"""
         GalleryScanner._scan_progress = ScanProgress(

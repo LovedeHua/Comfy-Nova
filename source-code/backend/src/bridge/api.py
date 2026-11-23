@@ -7714,6 +7714,10 @@ class Api:
         """全量扫描输入图片库（与生成图库分开管理）"""
         return self._gallery_controller.gallery_scan_input(input_library_path)
 
+    def gallery_start_background_incremental_scan(self, library_path: str = None) -> dict:
+        """在后台启动增量扫描（立即返回，前端轮询 gallery_get_scan_status）"""
+        return self._gallery_controller.gallery_start_background_incremental_scan(library_path)
+
     def gallery_incremental_scan(self, library_path: str = None) -> dict:
         """增量扫描资产库目录"""
         return self._gallery_controller.gallery_incremental_scan(library_path)

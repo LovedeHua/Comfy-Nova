@@ -1795,6 +1795,12 @@ export interface PyWebViewAPI {
     error_message?: string
   }>;
 
+  gallery_start_background_incremental_scan: (libraryPath?: string) => Promise<{
+    success: boolean
+    message?: string
+    error_message?: string
+  }>;
+
   gallery_incremental_scan: (libraryPath?: string) => Promise<{
     success: boolean
     added?: number

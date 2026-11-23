@@ -35,7 +35,9 @@ import { markImageDecoded } from '@/lib/decodedImages'
 
 // 首次进入资产库才做自动扫描+加载；从其他模块切回时数据仍在 store，
 // 不再重复请求，避免缩略图重新加载造成整屏刷新闪烁。
-let autoInitialized = false
+// 记录自动扫描是否已完成。只有真的跑成功才置位——此前一进页面就置 true，
+// 一旦那次扫描失败/超时，之后切回资产库再也不会重试，表现为"一直扫不出东西"。
+let autoScanCompleted = false
 
 function getCategoryPath(
   categoryId: string,
@@ -122,11 +124,14 @@ export default function AssetLibraryPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // 只在首次进入时自动扫描+加载；之后从其他模块切回直接用 store 里的缓存数据。
-    // 手动刷新（工具栏刷新按钮）不受此标记影响，仍可随时重新扫描。
-    if (autoInitialized) return
-    autoInitialized = true
-    incrementalScanLibrary()
+    // 首次进入自动扫描一次；成功后不再重复（切模块回来用 store 缓存）。
+    // 失败则不置位，下次进入会重试——否则一次失败就永久放弃。
+    if (autoScanCompleted) return
+    let cancelled = false
+    void incrementalScanLibrary().then((result) => {
+      if (!cancelled && result?.success) autoScanCompleted = true
+    })
+    return () => { cancelled = true }
   }, [incrementalScanLibrary])
 
   const filteredAssets = getFilteredAssets()
