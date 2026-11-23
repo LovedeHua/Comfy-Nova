@@ -70,14 +70,9 @@ class GalleryController:
                 if source
                 else gallery_storage.get_assets()
             )
-            # 输入图库不使用文件夹分类：只返回系统分类（全部/收藏），
-            # 避免输入图标签下出现生成库的文件夹列表。
-            all_categories = gallery_storage.get_categories()
-            categories = (
-                [cat for cat in all_categories if cat.is_system]
-                if source == "input"
-                else all_categories
-            )
+            # 按来源返回分类：系统分类共享，文件夹分类按 source 隔离。
+            # 输入图库显示的是输入目录下的子文件夹，生成库显示生成目录下的子文件夹。
+            categories = gallery_storage.get_categories(source) if source else gallery_storage.get_categories()
             settings = gallery_storage.get_settings()
 
             return {

@@ -177,7 +177,7 @@ class GalleryScanner:
         # 只清生成图（source=generated），输入图（source=input）是独立库，不能被波及
         gallery_storage.clear_generated_data()
 
-        self._sync_categories_from_folders(library_dir)
+        self._sync_categories_from_folders(library_dir, source="generated")
 
         existing_assets = {a.file_path: a for a in gallery_storage.get_assets() if a.source == "generated"}
         found_files = {}
@@ -285,7 +285,7 @@ class GalleryScanner:
 
         self._thumbnails_dir.mkdir(parents=True, exist_ok=True)
 
-        self._sync_categories_from_folders(library_dir)
+        self._sync_categories_from_folders(library_dir, source="generated")
 
         # 只处理生成图库资产；输入图库（source=input）由 scan_input_library 独立管理，
         # 绝不能被生成库扫描当作"已删除"清掉——这是两库串数据的关键隔离点。
@@ -411,6 +411,9 @@ class GalleryScanner:
         input_thumbs = self._thumbnails_dir / "input"
         input_thumbs.mkdir(parents=True, exist_ok=True)
 
+        # 从输入库的文件夹结构同步分类（source=input），让子文件夹在分类树中可见
+        self._sync_categories_from_folders(library_dir, source="input")
+
         # 不用 clear_input_data()：它会先把旧记录抹掉，导致下面的删除检测永远失效。
         # 改用与增量扫描一致的"快照对比"策略：已有则更新、缺失则删除，天然幂等。
         existing_assets = {a.file_path: a for a in gallery_storage.get_assets() if a.source == "input"}
@@ -432,6 +435,15 @@ class GalleryScanner:
                 relative = str(file_path.relative_to(library_dir)).replace("\\", "/")
                 found_files[relative] = file_path
 
+                # 按文件所在文件夹关联对应的 input 分类
+                relative_dir = file_path.parent.relative_to(library_dir)
+                folder_path = str(relative_dir).replace("\\", "/") if str(relative_dir) != "." else None
+                category_id = None
+                if folder_path:
+                    category = gallery_storage.get_category_by_folder_path(folder_path, source="input")
+                    if category:
+                        category_id = category.id
+
                 stat = file_path.stat()
                 existing = existing_assets.get(str(file_path))
                 if existing is not None:
@@ -441,11 +453,11 @@ class GalleryScanner:
                     if not self._needs_update(existing, file_path):
                         found_files[relative] = existing
                         continue
-                    self._update_asset(existing, file_path)
+                    self._update_asset(existing, file_path, category_id)
                     existing.source = "input"
                     updated_count += 1
                 else:
-                    asset = self._create_asset(file_path, category_id=None, source="input")
+                    asset = self._create_asset(file_path, category_id=category_id, source="input")
                     if asset is not None:
                         gallery_storage.add_asset(asset)
                         added_count += 1
@@ -477,15 +489,23 @@ class GalleryScanner:
             "errors": errors
         }
 
-    def _sync_categories_from_folders(self, library_dir: Path):
+    def _sync_categories_from_folders(self, library_dir: Path, source: str = "generated"):
         """
         从文件夹结构同步分类（递归扫描所有层级）
         子文件夹自动成为分类，支持多级嵌套
+
+        Args:
+            library_dir: 要扫描的库根目录
+            source: 分类所属来源（generated/input），同名文件夹按来源隔离
         """
         # 每个子目录都会 add_category 一次，逐条落盘会让分类同步变成 O(M^2)。
         # 与资产扫描一样，整批包进一次 batch_updates。
         with gallery_storage.batch_updates():
-            existing_categories = {c.folder_path: c for c in gallery_storage.get_categories() if c.folder_path}
+            existing_categories = {
+                c.folder_path: c
+                for c in gallery_storage.get_categories()
+                if c.folder_path and (c.source or "generated") == source
+            }
             found_folder_paths = set()
 
             def scan_directory(current_dir: Path, relative_path: str, parent_category_id: Optional[str] = None):
@@ -499,7 +519,8 @@ class GalleryScanner:
                             category = gallery_storage.add_category(
                                 name=item.name,
                                 parent_id=parent_category_id,
-                                folder_path=current_relative_path
+                                folder_path=current_relative_path,
+                                source=source,
                             )
                         else:
                             category = existing_categories[current_relative_path]

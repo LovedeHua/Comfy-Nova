@@ -303,9 +303,12 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         const mockForSource = get().assetSource === 'input'
           ? mockAssets.filter((a) => a.source === 'input')
           : mockAssets.filter((a) => !a.source || a.source === 'generated')
+        const mockCatsForSource = get().assetSource === 'input'
+          ? mockAssetCategories.filter((c) => c.source === 'input' || (c.isSystem))
+          : mockAssetCategories.filter((c) => !c.source || c.source === 'generated' || c.isSystem)
         set({
           assets: mockForSource,
-          categories: mockAssetCategories,
+          categories: mockCatsForSource,
           settings: { libraryPath: '', inputLibraryPath: '', lastScanTime: null, nsfwAutoClassify: false, nsfwThreshold: 0.6, nsfwAutoBlur: true },
           isLoading: false
         })

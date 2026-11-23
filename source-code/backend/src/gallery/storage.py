@@ -188,7 +188,11 @@ class GalleryStorage:
         """清空生成图资产（source=generated）与其文件夹分类，输入图库不受影响。"""
         data = self.load()
         data.assets = [a for a in data.assets if a.source != "generated"]
-        data.categories = [c for c in data.categories if c.is_system]
+        # 只删 generated 的文件夹分类，input 分类必须保留
+        data.categories = [
+            c for c in data.categories
+            if c.is_system or (c.source or "generated") != "generated"
+        ]
         return self.save()
 
     def clear_input_data(self) -> bool:
@@ -254,12 +258,25 @@ class GalleryStorage:
             self.save()
         return count
 
-    def get_categories(self) -> list[AssetCategory]:
-        """获取分类列表"""
-        data = self.load()
-        return data.categories
+    def get_categories(self, source: str = None) -> list[AssetCategory]:
+        """获取分类列表。
 
-    def add_category(self, name: str, parent_id: Optional[str] = None, folder_path: Optional[str] = None) -> AssetCategory:
+        Args:
+            source: 指定来源时返回系统分类 + 该来源的文件夹分类；
+                    不传则返回全部（兼容旧调用方）。
+        """
+        data = self.load()
+        if source is None:
+            return data.categories
+        return [c for c in data.categories if c.is_system or (c.source or "generated") == source]
+
+    def add_category(
+        self,
+        name: str,
+        parent_id: Optional[str] = None,
+        folder_path: Optional[str] = None,
+        source: str = "generated",
+    ) -> AssetCategory:
         """添加分类"""
         data = self.load()
         category = AssetCategory(
@@ -268,7 +285,8 @@ class GalleryStorage:
             is_system=False,
             parent_id=parent_id,
             sort_order=len([c for c in data.categories if not c.is_system]),
-            folder_path=folder_path
+            folder_path=folder_path,
+            source=source,
         )
         data.categories.append(category)
         self.save()
@@ -394,11 +412,11 @@ class GalleryStorage:
                 return category
         return None
 
-    def get_category_by_folder_path(self, folder_path: str) -> Optional[AssetCategory]:
-        """根据文件夹路径获取分类"""
+    def get_category_by_folder_path(self, folder_path: str, source: str = "generated") -> Optional[AssetCategory]:
+        """根据文件夹路径获取分类（按来源区分，同名文件夹不串库）"""
         data = self.load()
         for category in data.categories:
-            if category.folder_path == folder_path:
+            if category.folder_path == folder_path and (category.source or "generated") == source:
                 return category
         return None
 

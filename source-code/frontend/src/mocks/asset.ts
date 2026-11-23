@@ -47,6 +47,8 @@ export interface AssetCategory {
   parentId: string | null
   sortOrder: number
   folderPath?: string
+  /** 分类所属来源：generated/input；系统分类共享 */
+  source?: 'generated' | 'input'
   children?: AssetCategory[]
 }
 

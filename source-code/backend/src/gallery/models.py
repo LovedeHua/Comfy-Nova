@@ -16,6 +16,8 @@ class AssetCategory:
     parent_id: Optional[str] = None
     sort_order: int = 0
     folder_path: Optional[str] = None
+    # 分类所属来源：generated=生成图库，input=输入图库（系统分类为共享）
+    source: str = "generated"
 
     def to_dict(self) -> dict:
         result = {
@@ -25,6 +27,8 @@ class AssetCategory:
             "parentId": self.parent_id,
             "sortOrder": self.sort_order
         }
+        if self.source != "generated":
+            result["source"] = self.source
         if self.folder_path is not None:
             result["folderPath"] = self.folder_path
         return result
@@ -37,7 +41,8 @@ class AssetCategory:
             is_system=data.get("isSystem", False),
             parent_id=data.get("parentId"),
             sort_order=data.get("sortOrder", 0),
-            folder_path=data.get("folderPath")
+            folder_path=data.get("folderPath"),
+            source=data.get("source", "generated")
         )
 
 
