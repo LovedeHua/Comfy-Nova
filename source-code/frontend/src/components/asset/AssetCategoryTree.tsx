@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   LayoutGrid,
@@ -41,6 +42,8 @@ export interface CategoryDeleteRequest {
 
 interface AssetCategoryTreeProps {
   className?: string
+  /** 侧边栏顶部的自定义头部（来源切换等），渲染在"新建分类"上方 */
+  header?: ReactNode
   onCreateCategory: (parentId: string | null, name: string) => void
   onRenameCategory: (id: string, name: string) => void
   onMoveCategory: (id: string, newParentId: string | null) => void
@@ -143,6 +146,7 @@ function MenuAction({
 
 export function AssetCategoryTree({
   className,
+  header,
   onCreateCategory,
   onRenameCategory,
   onMoveCategory,
@@ -434,6 +438,9 @@ export function AssetCategoryTree({
 
   return (
     <ResizableSidebar storageKey="asset-category-tree" className={className}>
+      {header && (
+        <div className="shrink-0 px-3 pb-2 pt-3">{header}</div>
+      )}
       <div className="shrink-0 px-3 pb-1 pt-3">
         {isCreatingRoot ? (
           renderCreateInput(0)

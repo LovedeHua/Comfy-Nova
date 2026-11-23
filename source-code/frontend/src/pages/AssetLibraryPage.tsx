@@ -612,6 +612,32 @@ export default function AssetLibraryPage() {
         <main className="relative flex flex-1 overflow-y-hidden overflow-x-clip">
           {!chromeHidden.nav && (
             <AssetCategoryTree
+              header={
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setAssetSource('generated')}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                      assetSource === 'generated'
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+                    )}
+                  >
+                    {t('asset.sourceTab.generated')}
+                  </button>
+                  <button
+                    onClick={() => setAssetSource('input')}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                      assetSource === 'input'
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+                    )}
+                  >
+                    {t('asset.sourceTab.input')}
+                  </button>
+                </div>
+              }
               onCreateCategory={handleCreateCategory}
               onRenameCategory={handleRenameCategory}
               onMoveCategory={handleMoveCategory}
@@ -619,33 +645,7 @@ export default function AssetLibraryPage() {
             />
           )}
 
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            {!theaterAsset && (
-              <div className="flex shrink-0 items-center gap-1 border-b border-border-subtle bg-surface px-3 py-1.5">
-                <button
-                  onClick={() => setAssetSource('generated')}
-                  className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                    assetSource === 'generated'
-                      ? 'bg-primary/15 text-primary'
-                      : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
-                  )}
-                >
-                  {t('asset.sourceTab.generated')}
-                </button>
-                <button
-                  onClick={() => setAssetSource('input')}
-                  className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                    assetSource === 'input'
-                      ? 'bg-primary/15 text-primary'
-                      : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
-                  )}
-                >
-                  {t('asset.sourceTab.input')}
-                </button>
-              </div>
-            )}
+          <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <div
               ref={scrollContainerRef}
               data-asset-scroll-container
