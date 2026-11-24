@@ -40,7 +40,7 @@ export function CPUMonitorCard({ data, historyData, cpuName, hardwareMonitorAvai
           label={t('monitor.power')}
           value={showPowerWarning ? null : data.power}
           unit="W"
-          warning={showPowerWarning ? t('monitor.needAdmin') : undefined}
+          warning={showPowerWarning ? t('monitor.needHwMonitor') : undefined}
         />
         <MetricBox
           label={t('monitor.coreFrequency')}

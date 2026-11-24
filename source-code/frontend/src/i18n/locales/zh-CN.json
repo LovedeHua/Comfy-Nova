@@ -2521,7 +2521,8 @@
         "kbPerSec": "KB/s",
         "mbPerSec": "MB/s"
       }
-    }
+    },
+    "needHwMonitor": "需硬件监控组件"
   },
   "terminal": {
     "title": "终端",

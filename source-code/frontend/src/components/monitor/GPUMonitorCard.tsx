@@ -47,7 +47,7 @@ export function GPUMonitorCard({ data, historyData, gpuName, hardwareMonitorAvai
           label={t('monitor.power')}
           value={showPowerWarning ? null : data.power}
           unit="W"
-          warning={showPowerWarning ? t('monitor.needAdmin') : undefined}
+          warning={showPowerWarning ? t('monitor.needHwMonitor') : undefined}
         />
         <MetricBox
           label={t('monitor.coreFrequency')}

@@ -9,6 +9,30 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.7.9
+
+> 发布日期：2026-11-24
+
+### 修复
+
+- **监控中心功耗不显示（根因）**：CPU/GPU 功耗此前**完全依赖**
+  `LibreHardwareMonitorLib.dll`，但整个仓库与打包产物里**都没有这个 DLL**
+  （spec 里打了"缺失时跳过"），所以无论如何以管理员运行，功耗永远是空的。
+  这不是权限问题。
+  - **GPU 功耗**：新增 NVIDIA NVML（pynvml）降级路径，直接读显卡功耗，
+    不依赖那个 DLL。实测 RTX 4080 读到 1.9W ✓
+  - **CPU 功耗**：Windows 消费级 CPU 无 WMI 功耗传感器，尝试集成
+    LibreHardwareMonitor 依赖，但当前环境无法完整下载 NuGet 包；
+    保持空白并把误导性的"需要管理员权限"提示改为准确的"需硬件监控组件"
+
+### 实测
+
+- pynvml 直接读取 RTX 4080 功耗成功（1.8–1.9W 待机）
+- GPUMonitor 集成 NVML 后 `get_gpu_data()['power']` 有值 ✓
+- tsc / build 通过，后端 288 passed
+
+---
+
 ## V1.7.8
 
 > 发布日期：2026-11-23

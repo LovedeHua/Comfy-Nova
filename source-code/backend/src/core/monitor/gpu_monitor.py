@@ -20,7 +20,9 @@ class GPUMonitor:
         self._gpu_name = None
         self._gpu_vendor = None
         self._vram_total = 0
+        self._nvml_handle = None
         self._init_hardware_monitor()
+        self._init_nvml()
         self._detect_gpu_info()
         
         logger.info(f"[GPUMonitor] GPU: {self._gpu_name or 'None'}, Vendor: {self._gpu_vendor or 'None'}")
@@ -39,6 +41,23 @@ class GPUMonitor:
             logger.warning(f"[GPUMonitor] 初始化 LibreHardwareMonitor 失败: {e}")
             self._hw_monitor = None
     
+    def _init_nvml(self) -> None:
+        """初始化 NVIDIA NVML，用于在没有 LibreHardwareMonitor 时读取 GPU 功耗。
+
+        LibreHardwareMonitor 依赖的 LibreHardwareMonitorLib.dll 项目里并未随包
+        提供，功耗此前恒为空。NVIDIA 显卡可直接用 pynvml 读功耗，不依赖该 DLL。
+        """
+        try:
+            import pynvml
+            pynvml.nvmlInit()
+            if pynvml.nvmlDeviceGetCount() > 0:
+                self._nvml_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                logger.info("[GPUMonitor] NVML 初始化成功（可读取 NVIDIA GPU 功耗）")
+        except Exception as e:
+            # 非 NVIDIA 显卡或驱动未装 NVML 时静默降级
+            logger.debug(f"[GPUMonitor] NVML 不可用: {e}")
+            self._nvml_handle = None
+
     def _detect_gpu_info(self):
         """检测 GPU 信息"""
         if self._hw_monitor and self._hw_monitor.is_available():
@@ -103,6 +122,14 @@ class GPUMonitor:
                         temperature = gpu.temperature if hasattr(gpu, 'temperature') else None
             except Exception:
                 pass
+        
+        # LibreHardwareMonitor 不可用时，用 NVML 补 NVIDIA GPU 功耗
+        if power is None and self._nvml_handle is not None:
+            try:
+                import pynvml
+                power = pynvml.nvmlDeviceGetPowerUsage(self._nvml_handle) / 1000.0
+            except Exception as e:
+                logger.debug(f"[GPUMonitor] NVML 功耗读取失败: {e}")
         
         gpu_available = self._gpu_name is not None and self._gpu_name != "Unknown GPU"
         
