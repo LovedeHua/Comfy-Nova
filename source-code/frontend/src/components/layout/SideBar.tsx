@@ -107,7 +107,9 @@ function SortableMenuItem({
           "hover:bg-muted",
           "hover:text-foreground hover:translate-x-1",
           "active:scale-[0.96]",
-          isCollapsed ? "w-11 h-11 justify-center !p-0 !gap-0 mx-auto hover:!translate-y-[-2px] hover:!translate-x-0" : "pr-4",
+          // 折叠态用 h-10(40px) 而非 h-11(44px)：展开态由 py-2.5 + text-sm 自然撑出 40px，
+          // 两态高度必须一致，否则每个菜单项累积 4px 偏差，折叠后整列位置都会变。
+          isCollapsed ? "w-10 h-10 justify-center !p-0 !gap-0 mx-auto hover:!translate-y-[-2px] hover:!translate-x-0" : "pr-4",
           isActive 
             ? "bg-surface-hover text-content-primary font-semibold" 
             : "text-muted-foreground",
@@ -204,7 +206,8 @@ function MenuItem({
           "hover:bg-muted",
           "hover:text-foreground hover:translate-x-1",
           "active:scale-[0.96]",
-          isCollapsed ? "w-11 h-11 justify-center !p-0 !gap-0 mx-auto hover:!translate-y-[-2px] hover:!translate-x-0" : "",
+          // 与展开态等高（40px），保证折叠切换时整列不位移
+          isCollapsed ? "w-10 h-10 justify-center !p-0 !gap-0 mx-auto hover:!translate-y-[-2px] hover:!translate-x-0" : "",
           isActive 
             ? "bg-surface-hover text-content-primary font-semibold" 
             : "text-muted-foreground"
