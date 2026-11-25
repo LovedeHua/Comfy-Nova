@@ -9,6 +9,30 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.8.0
+
+> 发布日期：2026-11-25
+
+### 变更
+
+- **应用图标换回上游 ComfyNexus 图标**：从
+  `https://github.com/Allen-xxa/ComfyNexus/blob/main/icon.png` 取回原版图标，
+  用项目自带的 `scripts/set_app_icon.py` 重新生成全部 4 个图标文件：
+  - `icon.ico`（窗口 / 任务栏 / PyInstaller，含 16–256 多尺寸）
+  - `icon.png`（系统托盘）
+  - `favicon.ico`（浏览器标签页）
+  - `app-icon.png`（侧边栏 / 关于页 / 更新器）
+  上游图标本身为透明底、深色主体；生成时用 `--dim-whites 1.0`
+  保持原样不做压暗，忠实还原。上游源图存于
+  `resource/img/icons/app/comfy-nexus-upstream.png` 便于以后复现
+
+### 实测
+
+- 生成图中心色 `(10,7,2,255)` 与源图完全一致，背景透明 ✓
+- 图标相关测试 17 passed
+
+---
+
 ## V1.7.9
 
 > 发布日期：2026-11-24
