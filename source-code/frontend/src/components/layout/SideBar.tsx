@@ -374,14 +374,19 @@ export function SideBar() {
           isCollapsed ? "w-[68px]" : "w-[200px]"
         )}
       >
-        <div 
-          className={cn(
-            "shrink-0 flex items-center gap-3 select-none pywebview-drag-region",
-            "transition-all duration-300",
-            isCollapsed ? "justify-center px-0 pt-6 pb-4 gap-0" : "justify-start px-[15px] pt-6 pb-4"
-          )}
-        >
-          <div className="size-8 shrink-0 overflow-hidden rounded-lg">
+        {/* logo 区固定 72px 高：折叠/展开切换时下方模块位置不跳动 */}
+        <div 
+          className={cn(
+            "shrink-0 flex items-center gap-3 select-none pywebview-drag-region",
+            "transition-all duration-300",
+            "h-[72px]",
+            isCollapsed ? "justify-center px-0 gap-0" : "justify-start px-[15px]"
+          )}
+        >
+          <div className={cn(
+            "shrink-0 overflow-hidden rounded-lg transition-all duration-300",
+            isCollapsed ? "size-7" : "size-8"
+          )}>
             <img 
               src="/logo/app-icon.png" 
               alt="Comfy-Nova" 
