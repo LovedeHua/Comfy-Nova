@@ -392,6 +392,26 @@ export function usePlugins(environmentId?: string | null): UsePluginsReturn {
    * 
    * @param plugin - 更新后的插件信息
    */
+  /*
+   * 依据 plugins 列表自动重算侧边栏「待更新」徽章。
+   *
+   * 单插件更新 / 批量更新走 updatePlugin 局部替换插件对象，不会经过
+   * loadPlugins/refreshPlugins 里那几处 setUpdateCount，导致更新完成后
+   * 侧边栏计数不消失。用 effect 监听列表变化，覆盖所有更新路径；
+   * 且不在 setState updater 里做副作用，避免严格模式下重复执行。
+   */
+  useEffect(() => {
+    const updateCount = plugins.filter(plugin => plugin.has_update).length;
+    console.log('[usePlugins] 自动同步待更新徽章:', {
+      environmentId: environmentId || null,
+      updateCount,
+      hasUpdatePlugins: plugins.filter(plugin => plugin.has_update).map(plugin => plugin.name)
+    });
+    void import('@/stores/usePluginUpdateBadgeStore').then(({ usePluginUpdateBadgeStore }) => {
+      usePluginUpdateBadgeStore.getState().setUpdateCount(environmentId || null, updateCount);
+    });
+  }, [plugins, environmentId]);
+
   const updatePlugin = useCallback((plugin: PluginInfo) => {
     console.log('[usePlugins] updatePlugin 被调用，插件:', plugin.name, '新的 commit_hash:', plugin.commit_hash);
     

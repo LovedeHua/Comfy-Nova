@@ -9,6 +9,28 @@
 - 变更条目用 `- ` 开头；分节用 `### 修复` / `### 改进` / `### 新增`
 - 与 `source-code/comfyui_box_version.py` 的版本号保持一致
 
+## V1.8.1
+
+> 发布日期：2026-11-25
+
+### 修复
+
+- **插件更新后侧边栏「待更新」计数不消失**：单插件更新与批量更新的完成
+  回调走 `updatePlugin` 局部替换插件对象，不经过 `loadPlugins`/
+  `refreshPlugins` 里那几处 `setUpdateCount`，所以徽章始终停在旧值。
+  在 `usePlugins` 中新增 effect 监听 `plugins` 列表变化，自动按
+  `has_update` 重算并同步徽章计数——覆盖单插件更新、批量更新、
+  启用/禁用等所有局部更新路径。不在 setState updater 里做副作用，
+  避免严格模式下重复执行。
+
+### 实测
+
+- 徽章 store `setUpdateCount` 3→0 正常 ✓
+- 构建产物含徽章自动同步逻辑 ✓
+- tsc / build 通过
+
+---
+
 ## V1.8.0
 
 > 发布日期：2026-11-25
